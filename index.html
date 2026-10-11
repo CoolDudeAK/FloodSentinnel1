@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="en" style="color-scheme: dark;">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FloodSentinnel — Monitoring &amp; Action Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-void:#08121d;
+    --bg-panel:#0d2237;
+    --bg-panel-alt:#0f2940;
+    --bg-raised:#122b44;
+    --grid-line: rgba(132,197,229,0.07);
+    --cyan:#6EADCC;
+    --cyan-bright:#9AD4F0;
+    --cyan-dim:#4784A1;
+    --orange:#FE8C2C;
+    --orange-dim:#C9701F;
+    --green:#4ADE95;
+    --green-dim:#2FAE73;
+    --risk-green:#3BD671;
+    --risk-yellow:#F5C518;
+    --risk-orange:#FF8C1A;
+    --risk-red:#FF4242;
+    --text-primary:#EAF3FA;
+    --text-secondary:#A8C0D3;
+    --text-muted:#6F8AA0;
+    --border-soft: rgba(132,197,229,0.22);
+    --border-orange: rgba(254,140,44,0.45);
+    --border-green: rgba(74,222,149,0.4);
+    --font-display:'Poppins',-apple-system,'Segoe UI',sans-serif;
+    --font-mono:'JetBrains Mono','Courier New',monospace;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg-void);color:var(--text-primary); overflow-x:hidden; max-width:100%;}
+  body{
+    font-family:var(--font-display);
+    line-height:1.5;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size:34px 34px;
+    background-attachment:fixed;
+    min-height:100vh;
+  }
+  a{color:var(--cyan-bright);}
+  :focus-visible{outline:2px solid var(--cyan-bright); outline-offset:2px;}
+  h1,h2,h3,h4{font-family:var(--font-display); font-weight:700; margin:0 0 .4em 0; letter-spacing:-.01em;}
+  p{margin:0 0 .8em 0; color:var(--text-secondary);}
+  .mono{font-family:var(--font-mono);}
+  .container{max-width:1180px; margin:0 auto; padding:0 20px;}
+  .hidden{display:none !important;}
+  button{font-family:var(--font-display); cursor:pointer;}
+  .visually-hidden{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap;}
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:40;
+    background:rgba(8,18,29,0.92);
+    backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--border-soft);
+  }
+  .topbar-inner{display:flex; align-items:center; gap:18px; padding:14px 20px; max-width:1180px; margin:0 auto; flex-wrap:wrap;}
+  .brand{display:flex; align-items:center; gap:10px; margin-right:auto;}
+  .brand-mark{
+    width:38px; height:38px; border-radius:8px;
+    background:linear-gradient(135deg, var(--bg-raised), var(--bg-panel));
+    border:1px solid var(--border-orange);
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px; flex-shrink:0;
+  }
+  .brand-text h1{font-size:17px; margin:0; color:var(--text-primary);}
+  .brand-text span{font-size:11px; color:var(--text-muted); font-family:var(--font-mono);}
+  nav.tabs{display:flex; gap:6px; flex-wrap:wrap;}
+  nav.tabs button{
+    background:transparent; border:1px solid transparent; color:var(--text-secondary);
+    font-size:13.5px; font-weight:600; padding:8px 13px; border-radius:8px;
+    transition:background .15s, color .15s, border-color .15s;
+    white-space:nowrap;
+  }
+  nav.tabs button:hover{background:var(--bg-panel); color:var(--text-primary);}
+  nav.tabs button[aria-selected="true"]{
+    background:var(--bg-panel-alt); color:var(--cyan-bright); border-color:var(--border-soft);
+  }
+  .howworks-btn{
+    background:var(--bg-panel-alt); border:1px solid var(--border-orange); color:var(--orange);
+    font-size:13px; font-weight:700; padding:8px 13px; border-radius:8px; display:flex; align-items:center; gap:6px;
+  }
+  .howworks-btn:hover{background:var(--bg-raised);}
+
+  /* ---------- Layout shell ---------- */
+  main{padding:28px 0 80px 0;}
+  .screen{animation:fadein .25s ease;}
+  @keyframes fadein{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
+  @media (prefers-reduced-motion: reduce){.screen{animation:none;}}
+
+  .page-head{margin-bottom:22px;}
+  .page-head h2{font-size:26px;}
+  .page-head .lede{font-size:15px; max-width:70ch;}
+  .badge-row{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
+  .badge{
+    display:inline-flex; align-items:center; gap:5px; font-size:11px; font-family:var(--font-mono);
+    padding:4px 9px; border-radius:20px; font-weight:600; letter-spacing:.02em;
+  }
+  .badge.real{background:rgba(74,222,149,0.12); color:var(--green); border:1px solid var(--border-green);}
+  .badge.sim{background:rgba(254,140,44,0.12); color:var(--orange); border:1px solid var(--border-orange);}
+  .badge.info{background:rgba(110,173,204,0.12); color:var(--cyan-bright); border:1px solid var(--border-soft);}
+
+  .grid{display:grid; gap:18px;}
+  .grid-2{grid-template-columns:1.3fr 1fr;}
+  .grid-3{grid-template-columns:repeat(3,1fr);}
+  .grid > *{min-width:0;}
+  @media (max-width:900px){ .grid-2, .grid-3{grid-template-columns:1fr;} }
+
+  .card{
+    background:var(--bg-panel); border:1px solid var(--border-soft); border-radius:var(--radius);
+    padding:20px; min-width:0;
+  }
+  .card h3{font-size:15px; color:var(--text-primary); display:flex; align-items:center; gap:8px;}
+  .card h3 .icon{font-size:17px;}
+  .card-tight{padding:14px 16px;}
+
+  /* ---------- Persona chips ---------- */
+  .persona-row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px;}
+  .persona-chip{
+    background:var(--bg-panel); border:1px solid var(--border-soft); color:var(--text-secondary);
+    padding:7px 13px; border-radius:20px; font-size:12.5px; font-weight:600;
+  }
+  .persona-chip[aria-pressed="true"]{background:var(--bg-panel-alt); border-color:var(--cyan-dim); color:var(--cyan-bright);}
+
+  /* ---------- Sliders ---------- */
+  .slider-block{margin-bottom:20px;}
+  .slider-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;}
+  .slider-label span:first-child{font-size:13px; font-weight:600; color:var(--text-primary);}
+  .slider-label span.value{font-family:var(--font-mono); font-size:14px; color:var(--cyan-bright);}
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:4px;
+    background:var(--bg-panel-alt); outline:none; border:1px solid var(--border-soft);
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:18px; height:18px; border-radius:50%;
+    background:var(--cyan-bright); border:2px solid var(--bg-void); cursor:pointer; margin-top:-1px;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px; border-radius:50%; background:var(--cyan-bright); border:2px solid var(--bg-void); cursor:pointer;
+  }
+  .slider-note{font-size:11.5px; color:var(--text-muted); margin-top:4px;}
+
+  .btn{
+    background:var(--bg-panel-alt); border:1px solid var(--border-soft); color:var(--text-primary);
+    padding:9px 15px; border-radius:8px; font-size:13px; font-weight:600;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .btn:hover{background:var(--bg-raised);}
+  .btn.primary{background:linear-gradient(135deg, var(--orange), var(--orange-dim)); border-color:transparent; color:#1a0f04;}
+  .btn.primary:hover{filter:brightness(1.08);}
+  .btn.ghost{background:transparent;}
+  .btn.small{padding:6px 11px; font-size:12px;}
+  .btn:disabled{opacity:.4; cursor:not-allowed;}
+
+  /* ---------- Risk banner ---------- */
+  .risk-banner{
+    border-radius:var(--radius); padding:22px; display:flex; align-items:center; gap:18px;
+    border:1px solid var(--border-soft); background:var(--bg-panel-alt);
+    transition:background .4s, border-color .4s;
+  }
+  .risk-icon{
+    width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:26px; flex-shrink:0; border:2px solid currentColor;
+  }
+  .risk-banner h3{font-size:22px; margin:0; letter-spacing:.02em;}
+  .risk-banner .sub{font-size:13px; color:var(--text-secondary); margin-top:2px;}
+  .risk-state-green{color:var(--risk-green);}
+  .risk-state-yellow{color:var(--risk-yellow);}
+  .risk-state-orange{color:var(--risk-orange);}
+  .risk-state-red{color:var(--risk-red);}
+  .risk-banner.rg{background:rgba(59,214,113,0.08); border-color:rgba(59,214,113,0.35);}
+  .risk-banner.ry{background:rgba(245,197,24,0.08); border-color:rgba(245,197,24,0.35);}
+  .risk-banner.ro{background:rgba(255,140,26,0.09); border-color:rgba(255,140,26,0.4);}
+  .risk-banner.rr{background:rgba(255,66,66,0.1); border-color:rgba(255,66,66,0.45); animation:pulse-red 1.4s infinite;}
+  @keyframes pulse-red{0%,100%{box-shadow:0 0 0 0 rgba(255,66,66,0.25);} 50%{box-shadow:0 0 0 8px rgba(255,66,66,0);}}
+  @media (prefers-reduced-motion: reduce){.risk-banner.rr{animation:none;}}
+
+  .output-row{display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;}
+  .output-pill{
+    flex:1; min-width:150px; background:var(--bg-void); border:1px solid var(--border-soft); border-radius:8px;
+    padding:11px 13px;
+  }
+  .output-pill .k{font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); font-family:var(--font-mono);}
+  .output-pill .v{font-size:14px; font-weight:700; margin-top:3px;}
+  .output-pill.on{border-color:var(--border-orange);}
+
+  .sms-preview{
+    background:var(--bg-void); border:1px solid var(--border-soft); border-radius:12px; padding:14px 16px;
+    font-family:var(--font-mono); font-size:13px; color:var(--text-primary); position:relative; margin-top:10px;
+  }
+  .sms-preview::before{content:"SMS PREVIEW"; position:absolute; top:-9px; left:12px; background:var(--bg-panel);
+    padding:0 6px; font-size:9.5px; letter-spacing:.08em; color:var(--text-muted);}
+
+  .log-list{list-style:none; margin:0; padding:0; max-height:260px; overflow-y:auto;}
+  .log-list li{
+    display:flex; gap:10px; padding:9px 0; border-bottom:1px solid var(--border-soft); font-size:12.5px;
+  }
+  .log-list li:last-child{border-bottom:none;}
+  .log-list time{font-family:var(--font-mono); color:var(--text-muted); flex-shrink:0; width:64px;}
+  .log-dot{width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0;}
+
+  details.methodology{margin-top:16px; font-size:12.5px; color:var(--text-secondary);}
+  details.methodology summary{cursor:pointer; color:var(--cyan-bright); font-weight:600; font-size:12.5px;}
+  details.methodology .m-body{margin-top:10px; padding:12px 14px; background:var(--bg-void); border-radius:8px; border:1px solid var(--border-soft);}
+
+  /* ---------- Ticket queue ---------- */
+  .ticket-queue-wrap{border:1px dashed var(--border-orange); border-radius:var(--radius); padding:16px; margin-top:18px; background:rgba(254,140,44,0.03);}
+  table.tickets{width:100%; border-collapse:collapse; font-size:12.5px; margin-top:10px; table-layout:fixed;}
+  table.tickets th:nth-child(1), table.tickets td:nth-child(1){width:11%;}
+  table.tickets th:nth-child(2), table.tickets td:nth-child(2){width:13%;}
+  table.tickets th:nth-child(3), table.tickets td:nth-child(3){width:20%;}
+  table.tickets th:nth-child(4), table.tickets td:nth-child(4){width:10%;}
+  table.tickets th:nth-child(5), table.tickets td:nth-child(5){width:13%;}
+  table.tickets th:nth-child(6), table.tickets td:nth-child(6){width:16%;}
+  table.tickets th:nth-child(7), table.tickets td:nth-child(7){width:17%;}
+  table.tickets th{text-align:left; font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); padding:6px 6px; border-bottom:1px solid var(--border-soft); overflow-wrap:break-word;}
+  table.tickets td{padding:9px 6px; border-bottom:1px solid var(--grid-line); vertical-align:middle; overflow-wrap:break-word;}
+  .status-pill{font-size:10.5px; font-weight:700; padding:3px 8px; border-radius:20px; font-family:var(--font-mono); white-space:nowrap; display:inline-block;}
+  .status-open{background:rgba(255,140,26,0.14); color:var(--risk-orange);}
+  .status-progress{background:rgba(110,173,204,0.14); color:var(--cyan-bright);}
+  .status-resolved{background:rgba(74,222,149,0.14); color:var(--green);}
+  .empty-state{text-align:center; padding:26px 10px; color:var(--text-muted); font-size:13px;}
+
+  /* ---------- Zone / drain grid ---------- */
+  .item-list{display:flex; flex-direction:column; gap:8px; margin-bottom:14px;}
+  .item-row{
+    display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; border:1px solid var(--border-soft);
+    background:var(--bg-void); cursor:pointer; text-align:left; width:100%; color:var(--text-primary);
+  }
+  .item-row[aria-pressed="true"]{border-color:var(--cyan-dim); background:var(--bg-panel-alt);}
+  .item-row .name{font-weight:600; font-size:13px; flex:1;}
+  .item-row .reading{font-family:var(--font-mono); font-size:12.5px; color:var(--text-secondary);}
+  .mini-bar{width:60px; height:6px; border-radius:4px; background:var(--bg-panel-alt); overflow:hidden; flex-shrink:0;}
+  .mini-bar-fill{height:100%; border-radius:4px;}
+
+  /* ---------- Onboarding ---------- */
+  .onboard-overlay{
+    position:fixed; inset:0; z-index:80; background:rgba(5,10,17,0.86); backdrop-filter:blur(3px);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .onboard-card{
+    max-width:700px; width:100%; max-height:88vh; overflow-y:auto; background:var(--bg-panel);
+    border:1px solid var(--border-orange); border-radius:16px; padding:32px;
+  }
+  @media (max-width:600px){.onboard-card{padding:22px;}}
+
+  /* ---------- Drawer ---------- */
+  .drawer-btn{
+    position:fixed; right:20px; bottom:20px; z-index:50;
+    background:linear-gradient(135deg, var(--orange), var(--orange-dim)); color:#1a0f04;
+    border:none; border-radius:26px; padding:12px 18px; font-weight:700; font-size:13px;
+    box-shadow:0 6px 18px rgba(0,0,0,.4); display:flex; align-items:center; gap:7px;
+  }
+  .drawer{
+    position:fixed; top:0; right:0; bottom:0; width:min(400px, 92vw); z-index:70;
+    background:var(--bg-panel); border-left:1px solid var(--border-soft);
+    transform:translateX(100%); transition:transform .25s ease; overflow-y:auto; padding:24px;
+  }
+  .drawer.open{transform:translateX(0);}
+  .drawer-backdrop{position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.45); opacity:0; pointer-events:none; transition:opacity .25s;}
+  .drawer-backdrop.open{opacity:1; pointer-events:auto;}
+  .drawer-close{position:absolute; top:18px; right:18px; background:none; border:none; color:var(--text-secondary); font-size:22px; line-height:1;}
+
+  /* ---------- Info page ---------- */
+  .info-nav{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:22px; position:sticky; top:70px; z-index:5; background:rgba(8,18,29,0.9); padding:8px 0;}
+  .info-nav a{
+    font-size:12px; font-weight:600; color:var(--text-secondary); background:var(--bg-panel); border:1px solid var(--border-soft);
+    padding:6px 11px; border-radius:16px; text-decoration:none;
+  }
+  .info-nav a:hover{color:var(--cyan-bright); border-color:var(--cyan-dim);}
+  .info-section{margin-bottom:34px; scroll-margin-top:120px;}
+  table.data{width:100%; border-collapse:collapse; font-size:13px; margin-top:12px;}
+  table.data th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); font-family:var(--font-mono); padding:8px; border-bottom:1px solid var(--border-soft);}
+  table.data td{padding:10px 8px; border-bottom:1px solid var(--grid-line); color:var(--text-secondary);}
+  table.data td.num{font-family:var(--font-mono); color:var(--cyan-bright); white-space:nowrap;}
+  .score-row{display:flex; align-items:center; gap:10px; margin-bottom:9px;}
+  .score-row .label{width:180px; font-size:12.5px; flex-shrink:0;}
+  .score-track{flex:1; height:8px; background:var(--bg-void); border-radius:4px; overflow:hidden; border:1px solid var(--border-soft);}
+  .score-fill{height:100%; border-radius:4px; background:linear-gradient(90deg, var(--cyan-dim), var(--cyan-bright));}
+  .score-val{font-family:var(--font-mono); font-size:12.5px; width:34px; text-align:right; color:var(--cyan-bright);}
+  .compare-note{border-left:3px solid var(--orange); padding:10px 14px; background:rgba(254,140,44,0.06); border-radius:0 8px 8px 0; font-size:12.5px; margin-top:12px;}
+  .source-list{font-size:11.5px; color:var(--text-muted); line-height:1.8;}
+  .layer-row{display:flex; gap:14px; align-items:flex-start; padding:12px 0; border-bottom:1px solid var(--grid-line);}
+  .layer-row:last-child{border-bottom:none;}
+  .layer-num{font-family:var(--font-mono); font-size:12px; color:var(--bg-void); background:var(--cyan-bright); width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-weight:700;}
+  .rvf-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:10px;}
+  @media (max-width:800px){.rvf-grid{grid-template-columns:1fr;}}
+  .rvf-col h4{font-size:12.5px; text-transform:uppercase; letter-spacing:.04em;}
+  .rvf-col.real h4{color:var(--green);}
+  .rvf-col.sim h4{color:var(--orange);}
+  .rvf-col.future h4{color:var(--cyan-bright);}
+  .rvf-col ul{margin:8px 0 0 0; padding-left:18px; font-size:12.5px; color:var(--text-secondary);}
+  .rvf-col li{margin-bottom:6px;}
+
+  footer{border-top:1px solid var(--border-soft); padding:26px 0; text-align:center; color:var(--text-muted); font-size:12px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-mark">🌊</div>
+      <div class="brand-text">
+        <h1>FloodSentinnel</h1>
+        <span>Team VitaForge · Prototype demo</span>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Windows">
+      <button data-tab="overview" aria-selected="true">Overview</button>
+      <button data-tab="core" aria-selected="false">FloodSentinel Core</button>
+      <button data-tab="drainwatch" aria-selected="false">DrainWatch</button>
+      <button data-tab="jalsetu" aria-selected="false">JalSetu</button>
+      <button data-tab="info" aria-selected="false">Info &amp; Sources</button>
+    </nav>
+    <button class="howworks-btn" id="openDrawerBtn" type="button">❓ How this works</button>
+  </div>
+</div>
+
+<main class="container" id="mainContent">
+
+  <!-- ============ OVERVIEW ============ -->
+  <section class="screen" id="screen-overview">
+    <div class="page-head">
+      <div class="badge-row">
+        <span class="badge info">🏗️ ONE CORE ENGINE · TWO SUPPORTING WINDOWS</span>
+      </div>
+      <h2 style="margin-top:14px;">A village-level flood alarm — extended to two urban problems it wasn't built for.</h2>
+      <p class="lede">FloodSentinnel monitors a river or drain, decides how dangerous the situation is, and pushes that decision out as a siren, an SMS, and a dashboard alert. The same decision engine is reused, unmodified in concept, for two other problems: drain blockages (DrainWatch) and water-network leaks (JalSetu). This is a working prototype — every control below actually computes something. Nothing here is a static screenshot.</p>
+    </div>
+
+    <div class="grid grid-3" style="margin-bottom:26px;">
+      <div class="card">
+        <h3><span class="icon">🚨</span>FloodSentinel — Core</h3>
+        <p style="font-size:13px;">River/drain water level + rainfall → GREEN→YELLOW→ORANGE→RED risk engine → siren + SMS + dashboard, plus resilient-housing guidance.</p>
+        <button class="btn small" data-goto="core">Open Core →</button>
+      </div>
+      <div class="card">
+        <h3><span class="icon">🌀</span>DrainWatch</h3>
+        <p style="font-size:13px;">Drain/inlet blockage sensing → maintenance ticket routed to the ULB or panchayat, with a resolve flow. Monitoring <em>and</em> action.</p>
+        <button class="btn small" data-goto="drainwatch">Open DrainWatch →</button>
+      </div>
+      <div class="card">
+        <h3><span class="icon">🛰️</span>JalSetu</h3>
+        <p style="font-size:13px;">Water-network pressure/flow anomaly → localized to a zone (not a pipe) → the same kind of action ticket, to the water utility.</p>
+        <button class="btn small" data-goto="jalsetu">Open JalSetu →</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:22px;">
+      <h3><span class="icon">🎯</span>Three things worth actually doing, not just reading</h3>
+      <div class="grid grid-3" style="margin-top:14px;">
+        <div>
+          <strong style="font-size:13px;">1. Cascade a flood</strong>
+          <p style="font-size:12.5px;">On the Core screen, drag the river-level or rainfall slider (or hit "Run scenario") and watch the risk state climb through all four stages in real time — with the exact siren/SMS/dashboard copy that fires at each one.</p>
+        </div>
+        <div>
+          <strong style="font-size:13px;">2. Close a drain ticket</strong>
+          <p style="font-size:12.5px;">On DrainWatch, push a drain's blockage past threshold, watch a ticket appear in the action queue, then mark it resolved.</p>
+        </div>
+        <div>
+          <strong style="font-size:13px;">3. Localize a leak</strong>
+          <p style="font-size:12.5px;">On JalSetu, trigger a pressure anomaly and see it land in the <em>same</em> ticket queue used by DrainWatch — proof it's one engine, reused.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">⚖️</span>Read this before you judge the idea</h3>
+      <p style="font-size:13px;">Independent research scored this project's novelty at <strong>5.5/10</strong>: community flood alarms and raised-plinth housing already exist and are deployed in India, and <strong>Google Flood Hub already delivers hyperlocal flood alerts across Bihar specifically</strong> — where this team is based. This app doesn't claim to have invented flood alarms. The full honest positioning, named competitors, cost breakdown, and feasibility scorecard live on the <button class="btn small" data-goto="info" style="vertical-align:middle;">Info &amp; Sources page →</button></p>
+    </div>
+  </section>
+
+  <!-- ============ FLOODSENTINEL CORE ============ -->
+  <section class="screen hidden" id="screen-core">
+    <div class="page-head">
+      <h2>FloodSentinel — Core</h2>
+      <p class="lede">Rural + urban risk engine. Move the sliders (or run the scenario) to see the risk state cascade and watch the alerts that would actually go out.</p>
+      <div class="badge-row">
+        <span class="badge real">✓ REAL — risk engine computes live from your inputs</span>
+        <span class="badge sim">◐ SIMULATED — siren/SMS/forecast are simulated outputs, not connected to real hardware or a trained model</span>
+      </div>
+    </div>
+
+    <div class="persona-row" role="group" aria-label="View as">
+      <span style="font-size:12px; color:var(--text-muted); align-self:center; margin-right:2px;">View as:</span>
+      <button class="persona-chip" data-persona="resident" aria-pressed="true">🧑‍🌾 Resident / Farmer</button>
+      <button class="persona-chip" data-persona="authority" aria-pressed="false">🏛️ Disaster Authority</button>
+      <button class="persona-chip" data-persona="planner" aria-pressed="false">📐 Infrastructure Planner</button>
+      <button class="persona-chip" data-persona="responder" aria-pressed="false">🚑 Emergency Responder</button>
+    </div>
+
+    <div class="grid grid-2">
+      <div>
+        <div class="card">
+          <h3><span class="icon">🎚️</span>Sensor inputs</h3>
+          <div class="slider-block">
+            <div class="slider-label"><span>River / drain water level</span><span class="value mono" id="levelVal">2.1 m</span></div>
+            <input type="range" id="levelSlider" min="0" max="8" step="0.1" value="1.0" aria-label="River water level in meters">
+            <div class="slider-note">Bank-full reference: 6.0 m (illustrative)</div>
+          </div>
+          <div class="slider-block">
+            <div class="slider-label"><span>Rainfall intensity</span><span class="value mono" id="rainVal">12 mm/hr</span></div>
+            <input type="range" id="rainSlider" min="0" max="100" step="1" value="5" aria-label="Rainfall intensity in millimeters per hour">
+            <div class="slider-note">IMD "heavy rain" reference: ≥65 mm/hr</div>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
+            <button class="btn primary" id="runScenarioBtn" type="button">▶ Run flood scenario</button>
+            <button class="btn ghost" id="resetCoreBtn" type="button">Reset</button>
+          </div>
+          <details class="methodology">
+            <summary>Methodology — how the risk score is computed</summary>
+            <div class="m-body">
+              <p style="margin-bottom:8px;">score = 0.5 × (level ÷ 8m) + 0.3 × (rainfall ÷ 100mm/hr) + 0.2 × (rate-of-rise, capped ±3m/hr, normalized)</p>
+              <p style="margin-bottom:8px;">GREEN &lt; 0.25 · YELLOW 0.25–0.50 · ORANGE 0.50–0.75 · RED ≥ 0.75</p>
+              <p style="margin-bottom:0; color:var(--orange);">⚠ ILLUSTRATIVE thresholds. The dossier references exact numeric triggers living in a "Master Research &amp; Technical Strategy Document" not included in the source materials used to build this prototype — these values are reasonable stand-ins, not validated field thresholds.</p>
+            </div>
+          </details>
+        </div>
+
+        <div class="card" style="margin-top:18px;">
+          <h3><span class="icon">🏠</span>Resilient housing &amp; shelter</h3>
+          <p style="font-size:12.5px;">Site-specific reference guidance — not sensor-driven. Sourced from BMTPC "Improving Flood Resistance of Housing" (2010) and IS 16474:2016.</p>
+          <div class="output-row">
+            <div class="output-pill"><div class="k">Foundation</div><div class="v" style="font-size:12.5px;">Raised plinth, low-SBC compatible</div></div>
+            <div class="output-pill"><div class="k">Openings</div><div class="v" style="font-size:12.5px;">Flood vents at plinth level</div></div>
+            <div class="output-pill"><div class="k">Frame</div><div class="v" style="font-size:12.5px;">RCC column frame</div></div>
+          </div>
+          <div class="output-pill" style="margin-top:10px;" id="shelterPill">
+            <div class="k">Elevated shelter status</div>
+            <div class="v" id="shelterText">Standby — 0 / 500 capacity in use</div>
+          </div>
+          <p class="slider-note" style="margin-top:8px;">Shelter occupancy figure moves with the current risk state (simulated demand, not a real headcount feed).</p>
+        </div>
+      </div>
+
+      <div>
+        <div class="risk-banner" id="riskBanner">
+          <div class="risk-icon" id="riskIcon">✓</div>
+          <div>
+            <h3 id="riskLabel">SAFE</h3>
+            <div class="sub" id="riskSub">Risk score 0.13 — normal conditions</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3><span class="icon">📡</span>Cascading outputs</h3>
+          <div class="output-row">
+            <div class="output-pill" id="sirenPill"><div class="k">Village siren</div><div class="v" id="sirenText">OFF</div></div>
+            <div class="output-pill" id="dashPill"><div class="k">Dashboard alert</div><div class="v" id="dashText">None</div></div>
+          </div>
+          <div class="sms-preview" id="smsPreview">No SMS sent at this risk level.</div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3><span class="icon">📈</span>Forecast <span class="badge sim" style="margin-left:6px;">◐ SIMULATED</span></h3>
+          <p style="font-size:12px;">Deterministic extrapolation of the current rate-of-rise — <strong>not</strong> a trained XGBoost/LSTM model. The real product's design calls for that ML layer; it has not been trained on real data.</p>
+          <div class="output-row" id="forecastRow">
+            <div class="output-pill"><div class="k">+1h</div><div class="v mono" id="fc1">2.1 m</div></div>
+            <div class="output-pill"><div class="k">+3h</div><div class="v mono" id="fc3">2.1 m</div></div>
+            <div class="output-pill"><div class="k">+6h</div><div class="v mono" id="fc6">2.1 m</div></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3><span class="icon">🕒</span>Alert log <span class="badge info" style="margin-left:6px;">this session</span></h3>
+          <ul class="log-list" id="logList">
+            <li><time>--:--</time><span>No state changes yet — move a slider or run the scenario.</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DRAINWATCH ============ -->
+  <section class="screen hidden" id="screen-drainwatch">
+    <div class="page-head">
+      <h2>DrainWatch</h2>
+      <p class="lede">Urban drain/inlet blockage monitoring — <strong>and action</strong>. Passive self-clearing geometry is a design feature of the drain hardware itself, not a sensor; the sensor layer below tracks blockage risk and opens a ticket when it crosses threshold.</p>
+      <div class="badge-row">
+        <span class="badge real">✓ REAL — threshold logic and ticket queue are live and stateful this session</span>
+        <span class="badge sim">◐ SIMULATED — blockage % is a synthetic feed, not a live sensor</span>
+      </div>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <h3><span class="icon">🌀</span>Drains &amp; inlets — Muzaffarpur ward demo</h3>
+        <div class="item-list" id="drainList"></div>
+        <div id="drainControls"></div>
+      </div>
+      <div class="card">
+        <h3><span class="icon">🔧</span>Shared ULB Action Queue</h3>
+        <p style="font-size:12px;">This is the <strong>same queue component</strong> used by JalSetu below — one engine, two sensor domains, merged only here at the action layer.</p>
+        <div id="drainTicketWrap"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ JALSETU ============ -->
+  <section class="screen hidden" id="screen-jalsetu">
+    <div class="page-head">
+      <h2>JalSetu</h2>
+      <p class="lede">Water-network pressure/flow anomaly sensing. Localization is <strong>zone-level, not pipe-exact</strong> — that resolution limit is a real constraint of this approach, not a UI simplification, and it's stated here rather than implied away.</p>
+      <div class="badge-row">
+        <span class="badge real">✓ REAL — anomaly threshold and ticket queue are live and stateful this session</span>
+        <span class="badge sim">◐ SIMULATED — pressure/flow readings are a synthetic feed</span>
+      </div>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <h3><span class="icon">🛰️</span>Network zones</h3>
+        <div class="item-list" id="zoneList"></div>
+        <div id="zoneControls"></div>
+      </div>
+      <div class="card">
+        <h3><span class="icon">🔧</span>Shared ULB / Utility Action Queue</h3>
+        <p style="font-size:12px;">Same queue component as DrainWatch — a reviewer switching between the two windows sees the identical engine handling a completely different problem.</p>
+        <div id="zoneTicketWrap"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ INFO & SOURCES ============ -->
+  <section class="screen hidden" id="screen-info">
+    <div class="page-head">
+      <h2>Info &amp; Sources</h2>
+      <p class="lede">Every number, score, and claim used anywhere in this prototype, in one place — with what's real, what's simulated, and where each figure comes from.</p>
+    </div>
+
+    <nav class="info-nav">
+      <a href="#sec-different">Why we're different</a>
+      <a href="#sec-cost">Cost</a>
+      <a href="#sec-feasibility">Feasibility scorecard</a>
+      <a href="#sec-business">Business model</a>
+      <a href="#sec-impact">Impact numbers</a>
+      <a href="#sec-stack">Solution stack</a>
+      <a href="#sec-rvf">Real vs simulated</a>
+      <a href="#sec-sources">Sources &amp; notes</a>
+    </nav>
+
+    <div class="info-section" id="sec-different">
+      <h3>Why we're different (and why we're honest about not being first)</h3>
+      <p>Independent research scored this project's novelty <strong>5.5 / 10</strong>. Community flood alarms and raised-plinth housing are not new. Here's exactly what already exists, named directly rather than folded into a vague "other systems" bullet:</p>
+      <div style="overflow-x:auto;"><table class="data" style="min-width:600px;">
+        <thead><tr><th>System</th><th>What it already does</th><th>What FloodSentinnel actually adds</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Google Flood Hub</strong></td><td>Live across India since 2021, 360M+ people covered, specifically names Bihar as a focus state — the single most relevant named competitor for a Muzaffarpur-based team.</td><td>Physical local siren for low-smartphone/data-penetration areas; integrated housing/shelter design; offline deterministic fallback when connectivity drops.</td></tr>
+          <tr><td><strong>CWC FloodWatch</strong></td><td>Government system, live since Aug 2023, 500+ stations, 7-day advisories. Uses the <em>same</em> GREEN/YELLOW/ORANGE/RED colour scheme as this project's risk engine.</td><td>Village-level last-mile actuation (siren + SMS) and civil-resilience integration that a national advisory feed doesn't attempt.</td></tr>
+          <tr><td><strong>SACHET (NDMA/C-DOT)</strong></td><td>Pan-India SMS, cell-broadcast, and satellite (NavIC/GAGAN) alerting — meaning the national alert-<em>delivery</em> gap is narrower than it looks.</td><td>The real remaining gap is local physical actuation and civil-resilience integration, not alert delivery — this is where FloodSentinnel focuses.</td></tr>
+          <tr><td><strong>ICIMOD / Aaranyak CBFEWS</strong> (Assam, since 2010–11)</td><td>Precedent for exactly this kind of community sensor-to-siren alarm system — proven, operational, ~$700–800/unit.</td><td>Not first. FloodSentinnel's edge is extending the same core engine to two problems CBFEWS never addressed: drains (DrainWatch) and piped water networks (JalSetu).</td></tr>
+        </tbody>
+      </table></div>
+      <div class="compare-note">Our defensible edge, stated plainly: integration — a physical siren, integrated housing/shelter design, an offline deterministic fallback, and the same monitoring core extended to urban drains and water networks — not invention of any single piece.</div>
+    </div>
+
+    <div class="info-section" id="sec-cost">
+      <h3>Cost — two figures, kept deliberately separate</h3>
+      <p>Two different totals appear across this project's own source materials. They are not computed the same way, so they are not merged here:</p>
+      <div class="grid grid-2" style="margin-bottom:14px;">
+        <div class="card card-tight" style="border-color:var(--border-green);">
+          <div class="k mono" style="font-size:11px; color:var(--text-muted);">DOSSIER — LAB PROTOTYPE BOM ONLY</div>
+          <div style="font-size:24px; font-weight:800; color:var(--green); margin:6px 0;">₹6,300 – ₹7,600</div>
+          <p style="font-size:12px; margin:0;">Component cost only. Excludes IP67 enclosures, mounting masts, deep-cycle batteries, cabling, labor, and local maintenance training.</p>
+        </div>
+        <div class="card card-tight" style="border-color:var(--border-orange);">
+          <div class="k mono" style="font-size:11px; color:var(--text-muted);">MSME PITCH DECK'S OWN HEADLINE FIGURE</div>
+          <div style="font-size:24px; font-weight:800; color:var(--orange); margin:6px 0;">Under ₹8,600</div>
+          <p style="font-size:12px; margin:0;">Shown for transparency because it's the number in the deck. Kept separate here rather than reconciled with the BOM total above, since the two aren't scoped identically.</p>
+        </div>
+      </div>
+      <div style="overflow-x:auto;"><table class="data" style="min-width:600px;">
+        <thead><tr><th>Equipment</th><th>Function</th><th>Estimated cost</th></tr></thead>
+        <tbody>
+          <tr><td>Ultrasonic water-level sensor</td><td>Detect river water level</td><td class="num">₹600 – ₹1,500</td></tr>
+          <tr><td>Rainfall sensor (tipping bucket)</td><td>Monitor rainfall intensity</td><td class="num">₹800</td></tr>
+          <tr><td>ESP32 / Arduino</td><td>Microcontroller / system control</td><td class="num">₹400 – ₹800</td></tr>
+          <tr><td>GSM module</td><td>Send SMS alerts</td><td class="num">₹500</td></tr>
+          <tr><td>Siren alarm unit</td><td>Village warning system</td><td class="num">₹1,500</td></tr>
+          <tr><td>Solar panel unit</td><td>Power supply in remote areas</td><td class="num">₹2,500</td></tr>
+          <tr><td>Water tank model</td><td>Prototype demonstration setup</td><td class="num">₹1,000</td></tr>
+        </tbody>
+      </table></div>
+      <p style="font-size:12px; margin-top:10px;">Full field deployment per village: not separately costed in current source materials. The Civilathon deck's own estimate is 2–4× the BOM, costed per village — treat this as a rough multiplier, not a validated figure.</p>
+    </div>
+
+    <div class="info-section" id="sec-feasibility">
+      <h3>Feasibility scorecard (dossier Appendix A)</h3>
+      <div id="scoreRows"></div>
+    </div>
+
+    <div class="info-section" id="sec-business">
+      <h3>Business model — two segments, two revenue routes</h3>
+      <div class="grid grid-2">
+        <div class="card card-tight">
+          <h4 style="font-size:13px; margin-bottom:6px;">Rural</h4>
+          <p style="font-size:12.5px; margin:0;">NGO / government disaster-management partnership, plus a panchayat-level AMC (annual maintenance contract) for upkeep.</p>
+        </div>
+        <div class="card card-tight">
+          <h4 style="font-size:13px; margin-bottom:6px;">Urban</h4>
+          <p style="font-size:12.5px; margin:0;">ULB licensing for DrainWatch/JalSetu, positioned under AMRUT 2.0 / JJM-U funding, targeting the JJM-U non-revenue-water (NRW) &lt;20% goal.</p>
+        </div>
+      </div>
+      <p style="margin-top:14px; font-size:12.5px;"><strong>Path to scale:</strong> Smart Village Integration → B2G &amp; NGO Partnerships → Cross-State Scalability (designed to be modular across any flood-prone state with minimal localization).</p>
+    </div>
+
+    <div class="info-section" id="sec-impact">
+      <h3>Quantified impact</h3>
+      <div class="grid grid-2">
+        <div class="card card-tight">
+          <h4 style="font-size:13px;">National (NDMA / SBI / World Bank)</h4>
+          <ul style="font-size:12.5px; margin:8px 0 0 18px; color:var(--text-secondary);">
+            <li>~1,600 lives lost per year to floods</li>
+            <li>~75 lakh hectares affected per year</li>
+            <li>Annual economic loss ~₹15,000–20,000+ crore (SBI, 2023)</li>
+            <li>World Bank: ~US$9.8B total extreme-weather loss; floods ≈ 50% of that</li>
+          </ul>
+        </div>
+        <div class="card card-tight">
+          <h4 style="font-size:13px;">Bihar-specific (this team is Muzaffarpur-based)</h4>
+          <ul style="font-size:12.5px; margin:8px 0 0 18px; color:var(--text-secondary);">
+            <li>India's most flood-prone state</li>
+            <li>76% of North Bihar's population under recurring flood threat</li>
+            <li>73% of Bihar's geographic area affected</li>
+            <li>Bihar = 22.1% of India's flood-affected population</li>
+            <li>9,500+ lives lost in Bihar since 1979</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-section" id="sec-stack">
+      <h3>Five-layer solution stack</h3>
+      <div class="card">
+        <div class="layer-row"><div class="layer-num">1</div><div><strong>Detection</strong> — ESP32, water-level / rainfall / flow-rise sensing.</div></div>
+        <div class="layer-row"><div class="layer-num">2</div><div><strong>Alert</strong> — rule-based deterministic baseline + XGBoost/LSTM forecasting layer (simulated in this prototype), siren + SMS.</div></div>
+        <div class="layer-row"><div class="layer-num">3</div><div><strong>Infrastructure</strong> — flood-resilient housing: raised plinth, flood vents, RCC frames.</div></div>
+        <div class="layer-row"><div class="layer-num">4</div><div><strong>Shelter</strong> — elevated multipurpose evacuation centers, supply and livestock storage.</div></div>
+        <div class="layer-row"><div class="layer-num">5</div><div><strong>Diversion</strong> (additional innovation, genuinely more novel than the alarm/housing layers) — floodwater storage channels, reservoir redirection, drought-region reuse.</div></div>
+      </div>
+    </div>
+
+    <div class="info-section" id="sec-rvf">
+      <h3>Real vs. simulated vs. future — across this whole prototype</h3>
+      <div class="rvf-grid">
+        <div class="rvf-col real">
+          <h4>✓ Real</h4>
+          <ul>
+            <li>Risk-engine math and GREEN→RED state transitions</li>
+            <li>Threshold-crossing → ticket creation logic</li>
+            <li>Ticket queue state (open / resolved) for this session</li>
+            <li>All cost, scorecard and impact figures (sourced from the dossier/decks)</li>
+          </ul>
+        </div>
+        <div class="rvf-col sim">
+          <h4>◐ Simulated</h4>
+          <ul>
+            <li>All sensor readings (water level, rainfall, blockage %, pressure anomaly)</li>
+            <li>Siren activation and SMS delivery — no real hardware or carrier involved</li>
+            <li>+1h/+3h/+6h forecast — deterministic extrapolation, not a trained model</li>
+            <li>Shelter occupancy numbers</li>
+          </ul>
+        </div>
+        <div class="rvf-col future">
+          <h4>◑ Requires future work</h4>
+          <ul>
+            <li>ESP32/GSM/siren firmware flashing, wiring, and physical testing</li>
+            <li>Real SIM/carrier SMS testing</li>
+            <li>Trained XGBoost/LSTM model on real streamflow data</li>
+            <li>On-site pilot at an actual flood-prone village</li>
+            <li>Structural sign-off from a licensed engineer with real soil data</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-section" id="sec-sources">
+      <h3>Sources &amp; naming notes</h3>
+      <p style="font-size:12.5px;"><strong>Team:</strong> VitaForge — Manish Kumar Gupta, Alok Kumar Singh, Adarsh Kumar, Dinkee Kumari, Rahul Kumar. (The dossier's own title page also refers to the team as "JalRakshak Innovators (Team VitaForge)" — noted here for completeness; this app uses VitaForge throughout.)</p>
+      <p style="font-size:12.5px;"><strong>Product name:</strong> the dossier spells it "FloodSentinnel" (double n); this app uses that spelling throughout per the team's confirmation.</p>
+      <p style="font-size:12.5px;"><strong>3–4 hour early-warning claim:</strong> referenced in both pitch decks as a feature; both independent research documents in the dossier call it an unvalidated experimental target dependent on basin response time and upstream data. Treated here as a target to validate, not a delivered capability.</p>
+      <div class="source-list" style="margin-top:14px;">
+        Independent web verification (Sept 2026) per dossier: ICIMOD/Aaranyak CBFEWS coverage (Assam Tribune, ICIMOD, UN-SPIDER, dialogue.earth) · CWC FloodWatch app (India Water Portal, CWC circulars, Rajya Sabha reply, OpenGov Asia) · SACHET (NDMA/vikaspedia, C-DOT) · Google Flood Hub (AnalyticsIndiaMag, PreventionWeb, Moneylife) · BMTPC guidelines (bmtpc.org, IIASA/PreventionWeb benefit-cost study) · PGVS and Kerala CBFEWS (PreventionWeb, IndiaWaterPortal, DownToEarth, Mongabay) · India/Bihar flood damage statistics (NDMA/PMF IAS, PolicyCircle, Wikipedia "Floods in Bihar", AnantamIAS) · IS 16474:2016 (BIS) · Gandak River basin RF/XGBoost/LSTM streamflow study (DOI 10.1680/jwama.25.00076).
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="container">FloodSentinnel — Team VitaForge · Building Bharat Sampaark Civilathon (JSW) &amp; MSME 6.0 Hackathon · Working prototype, not a pitch deck</div>
+</footer>
+
+<!-- Onboarding overlay -->
+<div class="onboard-overlay" id="onboardOverlay">
+  <div class="onboard-card" role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
+    <h2 id="onboardTitle">Before you explore FloodSentinnel</h2>
+    <p>This is a working prototype, opened without anyone narrating it. Three quick things before you start:</p>
+    <div class="grid" style="margin:16px 0;">
+      <div class="card card-tight">
+        <strong style="font-size:13px;">1. One engine, three windows</strong>
+        <p style="font-size:12.5px; margin-top:4px;">FloodSentinel Core (rural + urban flood risk) is the engine. DrainWatch and JalSetu reuse the exact same risk-and-action logic for drains and water networks.</p>
+      </div>
+      <div class="card card-tight">
+        <strong style="font-size:13px;">2. Everything reacts</strong>
+        <p style="font-size:12.5px; margin-top:4px;">Every slider, button, and ticket is live. Nudge a sensor value and watch the state actually cascade — nothing here is a screenshot standing in for behavior.</p>
+      </div>
+      <div class="card card-tight">
+        <strong style="font-size:13px;">3. We say what's simulated</strong>
+        <p style="font-size:12.5px; margin-top:4px;">Sensor feeds, siren/SMS delivery, and the ML forecast are simulated and clearly badged. The risk logic, ticket queue, and every number on the Info page are real.</p>
+      </div>
+    </div>
+    <p style="font-size:12.5px;">This project's own research scores its novelty at 5.5/10 — full honest positioning is one tap away on the Info &amp; Sources page, any time.</p>
+    <button class="btn primary" id="onboardStartBtn" type="button">Start exploring →</button>
+  </div>
+</div>
+
+<!-- How this works drawer -->
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
+<div class="drawer" id="drawer" aria-hidden="true">
+  <button class="drawer-close" id="drawerCloseBtn" aria-label="Close panel">×</button>
+  <h3>How this works</h3>
+  <p style="font-size:13px;">FloodSentinnel is one risk-decision engine, used three times:</p>
+  <ul style="font-size:12.5px; color:var(--text-secondary); padding-left:18px;">
+    <li style="margin-bottom:8px;"><strong>FloodSentinel Core</strong> — river/drain level + rainfall → GREEN/YELLOW/ORANGE/RED → siren + SMS + dashboard.</li>
+    <li style="margin-bottom:8px;"><strong>DrainWatch</strong> — same engine, fed by drain-blockage % instead → opens a maintenance ticket.</li>
+    <li style="margin-bottom:8px;"><strong>JalSetu</strong> — same engine again, fed by pressure/flow anomaly → localizes to a zone, opens a ticket.</li>
+  </ul>
+  <h3 style="margin-top:18px;">What's real vs. simulated</h3>
+  <p style="font-size:12.5px;">Look for the <span class="badge real" style="vertical-align:middle;">✓ REAL</span> and <span class="badge sim" style="vertical-align:middle;">◐ SIMULATED</span> badges on every screen. Full breakdown on the Info page.</p>
+  <button class="btn small" style="margin-top:10px;" data-goto="info" id="drawerInfoBtn">Open Info &amp; Sources →</button>
+  <h3 style="margin-top:18px;">Jump to an experience moment</h3>
+  <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+    <button class="btn small" data-goto="core">1. Cascade a flood on Core</button>
+    <button class="btn small" data-goto="drainwatch">2. Close a ticket on DrainWatch</button>
+    <button class="btn small" data-goto="jalsetu">3. Localize a leak on JalSetu</button>
+  </div>
+</div>
+
+<button class="drawer-btn" id="floatingHowBtn" type="button">❓ How this works</button>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ===================================================================
+     APP STATE
+     =================================================================== */
+  var state = {
+    activeTab: 'overview',
+    persona: 'resident',
+    level: 1.0,
+    prevLevel: 1.0,
+    rain: 5,
+    rateOfRise: 0,
+    riskState: 'green',
+    scenarioRunning: false,
+    coreLog: [],
+    tickets: [],  // shared by DrainWatch + JalSetu {id, source, sourceName, location, severity, created, status}
+    drains: [
+      { id:'D-1', name:'Purani Bazar Inlet', blockage: 22 },
+      { id:'D-2', name:'Mithanpura Outfall', blockage: 38 },
+      { id:'D-3', name:'Kalambagh Drain', blockage: 15 },
+      { id:'D-4', name:'Chandwara Culvert', blockage: 51 },
+      { id:'D-5', name:'Motijheel Nullah', blockage: 29 }
+    ],
+    selectedDrain: 'D-1',
+    zones: [
+      { id:'Z-1', name:'Zone A — Old Town Main', anomaly: 18 },
+      { id:'Z-2', name:'Zone B — Aghoria Bazar', anomaly: 34 },
+      { id:'Z-3', name:'Zone C — Brahampura', anomaly: 12 },
+      { id:'Z-4', name:'Zone D — Mithanpura Extension', anomaly: 45 }
+    ],
+    selectedZone: 'Z-1',
+    ticketCounter: 1
+  };
+
+  var DRAIN_THRESHOLD = 65;
+  var ZONE_THRESHOLD = 60;
+
+  /* ===================================================================
+     RISK ENGINE  (integration point: replace computeRisk() body with a
+     real API/model call — signature can stay the same)
+     =================================================================== */
+  var RiskEngine = {
+    computeRisk: function(level, rain, rateOfRise){
+      var normLevel = Math.min(level / 8, 1);
+      var normRain = Math.min(rain / 100, 1);
+      var normRate = Math.min(Math.max(rateOfRise, -3), 3);
+      normRate = (normRate + 3) / 6; // 0..1
+      var score = 0.5*normLevel + 0.3*normRain + 0.2*normRate;
+      var stateName;
+      if (score < 0.25) stateName = 'green';
+      else if (score < 0.50) stateName = 'yellow';
+      else if (score < 0.75) stateName = 'orange';
+      else stateName = 'red';
+      return { score: score, state: stateName };
+    }
+  };
+
+  var STATE_META = {
+    green:  { label:'SAFE',     icon:'✓', cls:'rg', textCls:'risk-state-green',  color:'var(--risk-green)',
+      siren:'OFF', dash:'None',
+      sms:'No SMS sent at this risk level.',
+      dashMsg:'All clear — normal conditions.' },
+    yellow: { label:'ADVISORY', icon:'⚠', cls:'ry', textCls:'risk-state-yellow', color:'var(--risk-yellow)',
+      siren:'OFF — silent monitoring', dash:'Advisory posted',
+      sms:'FLOODSENTINNEL ADVISORY: Rising water levels detected near your village. No action needed yet — monitor updates.',
+      dashMsg:'Advisory: rising water levels detected. Monitoring escalated.' },
+    orange: { label:'WARNING',  icon:'⛔', cls:'ro', textCls:'risk-state-orange', color:'var(--risk-orange)',
+      siren:'ON — intermittent pattern', dash:'Warning issued to authority dashboard',
+      sms:'FLOODSENTINNEL WARNING: Water level approaching flood stage. Prepare to evacuate to your nearest shelter.',
+      dashMsg:'Warning: water level approaching flood stage. Preparation advised.' },
+    red:    { label:'EVACUATE', icon:'🚨', cls:'rr', textCls:'risk-state-red', color:'var(--risk-red)',
+      siren:'ON — continuous', dash:'Emergency escalated to Disaster Management Authority',
+      sms:'FLOODSENTINNEL EMERGENCY: EVACUATE NOW. Flood level critical. Proceed immediately to your designated shelter.',
+      dashMsg:'EMERGENCY: critical flood level. Evacuation in progress.' }
+  };
+
+  var PERSONA_NOTE = {
+    resident:  'As a resident, you would receive the SMS shown below directly, and hear the siren if it activates.',
+    authority: 'As a disaster-management authority, you would see this risk state aggregated across every monitored village on a regional dashboard.',
+    planner:   'As an infrastructure planner, your focus is the housing/shelter panel below — plinth height and shelter capacity, not the live sensor feed.',
+    responder: 'As an emergency responder, ORANGE and RED are your cue to stage at the shelter shown below.'
+  };
+
+  /* ===================================================================
+     TICKET SERVICE (integration point: swap create()/resolve() bodies
+     for real backend calls; shape of a ticket stays the same)
+     =================================================================== */
+  var TicketService = {
+    create: function(source, sourceName, location, severity){
+      var t = {
+        id: 'TCK-' + String(state.ticketCounter).padStart(4,'0'),
+        source: source, // 'DrainWatch' | 'JalSetu'
+        sourceName: sourceName,
+        location: location,
+        severity: severity,
+        created: nowStr(),
+        status: 'open'
+      };
+      state.ticketCounter++;
+      state.tickets.unshift(t);
+      return t;
+    },
+    resolve: function(id){
+      var t = state.tickets.find(function(tk){ return tk.id === id; });
+      if (t) t.status = 'resolved';
+    },
+    hasOpenFor: function(sourceName){
+      return state.tickets.some(function(tk){ return tk.sourceName === sourceName && tk.status === 'open'; });
+    }
+  };
+
+  function nowStr(){
+    var d = new Date();
+    var hh = String(d.getHours()).padStart(2,'0');
+    var mm = String(d.getMinutes()).padStart(2,'0');
+    var ss = String(d.getSeconds()).padStart(2,'0');
+    return hh+':'+mm+':'+ss;
+  }
+
+  function el(tag, attrs, children){
+    var e = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function(k){
+      if (k === 'class') e.className = attrs[k];
+      else if (k === 'html') e.innerHTML = attrs[k];
+      else if (k.indexOf('on') === 0 && typeof attrs[k] === 'function') e.addEventListener(k.slice(2), attrs[k]);
+      else e.setAttribute(k, attrs[k]);
+    });
+    (children||[]).forEach(function(c){ if (c) e.appendChild(c); });
+    return e;
+  }
+  function text(s){ return document.createTextNode(s); }
+
+  /* ===================================================================
+     TAB NAVIGATION
+     =================================================================== */
+  var tabs = ['overview','core','drainwatch','jalsetu','info'];
+  function showTab(name){
+    if (tabs.indexOf(name) === -1) return;
+    state.activeTab = name;
+    tabs.forEach(function(t){
+      document.getElementById('screen-'+t).classList.toggle('hidden', t !== name);
+    });
+    document.querySelectorAll('nav.tabs button').forEach(function(b){
+      b.setAttribute('aria-selected', b.getAttribute('data-tab') === name ? 'true' : 'false');
+    });
+    closeDrawer();
+    window.scrollTo({top:0, behavior:'instant' in window ? 'instant' : 'auto'});
+  }
+  document.querySelectorAll('nav.tabs button').forEach(function(b){
+    b.addEventListener('click', function(){ showTab(b.getAttribute('data-tab')); });
+  });
+  document.querySelectorAll('[data-goto]').forEach(function(b){
+    b.addEventListener('click', function(){ showTab(b.getAttribute('data-goto')); });
+  });
+
+  /* ===================================================================
+     ONBOARDING
+     =================================================================== */
+  document.getElementById('onboardStartBtn').addEventListener('click', function(){
+    document.getElementById('onboardOverlay').classList.add('hidden');
+  });
+
+  /* ===================================================================
+     DRAWER
+     =================================================================== */
+  function openDrawer(){
+    document.getElementById('drawer').classList.add('open');
+    document.getElementById('drawer').setAttribute('aria-hidden','false');
+    document.getElementById('drawerBackdrop').classList.add('open');
+  }
+  function closeDrawer(){
+    document.getElementById('drawer').classList.remove('open');
+    document.getElementById('drawer').setAttribute('aria-hidden','true');
+    document.getElementById('drawerBackdrop').classList.remove('open');
+  }
+  document.getElementById('openDrawerBtn').addEventListener('click', openDrawer);
+  document.getElementById('floatingHowBtn').addEventListener('click', openDrawer);
+  document.getElementById('drawerCloseBtn').addEventListener('click', closeDrawer);
+  document.getElementById('drawerBackdrop').addEventListener('click', closeDrawer);
+  document.getElementById('drawerInfoBtn').addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeDrawer(); });
+
+  /* ===================================================================
+     PERSONA CHIPS
+     =================================================================== */
+  document.querySelectorAll('.persona-chip').forEach(function(chip){
+    chip.addEventListener('click', function(){
+      document.querySelectorAll('.persona-chip').forEach(function(c){ c.setAttribute('aria-pressed','false'); });
+      chip.setAttribute('aria-pressed','true');
+      state.persona = chip.getAttribute('data-persona');
+      renderCore();
+    });
+  });
+
+  /* ===================================================================
+     CORE SCREEN
+     =================================================================== */
+  var levelSlider = document.getElementById('levelSlider');
+  var rainSlider = document.getElementById('rainSlider');
+
+  function updateFromSliders(){
+    var newLevel = parseFloat(levelSlider.value);
+    state.rateOfRise = (newLevel - state.prevLevel) * 6; // extrapolate per-drag delta to an hourly rate (illustrative)
+    state.prevLevel = state.level;
+    state.level = newLevel;
+    state.rain = parseFloat(rainSlider.value);
+    renderCore();
+  }
+  levelSlider.addEventListener('input', updateFromSliders);
+  rainSlider.addEventListener('input', updateFromSliders);
+
+  document.getElementById('resetCoreBtn').addEventListener('click', function(){
+    stopScenario();
+    levelSlider.value = 1.0; rainSlider.value = 5;
+    state.level = 1.0; state.prevLevel = 1.0; state.rain = 5; state.rateOfRise = 0;
+    state.coreLog = [];
+    renderCore(true);
+  });
+
+  var scenarioTimer = null;
+  function stopScenario(){
+    if (scenarioTimer) { clearInterval(scenarioTimer); scenarioTimer = null; }
+    state.scenarioRunning = false;
+    document.getElementById('runScenarioBtn').textContent = '▶ Run flood scenario';
+  }
+  document.getElementById('runScenarioBtn').addEventListener('click', function(){
+    if (state.scenarioRunning) { stopScenario(); return; }
+    state.scenarioRunning = true;
+    this.textContent = '■ Stop scenario';
+    var steps = [
+      {level:2.5, rain:20}, {level:3.4, rain:35}, {level:4.3, rain:48},
+      {level:5.2, rain:60}, {level:6.1, rain:75}, {level:6.9, rain:88}, {level:7.4, rain:92}
+    ];
+    var i = 0;
+    scenarioTimer = setInterval(function(){
+      if (i >= steps.length) { stopScenario(); return; }
+      var s = steps[i];
+      state.rateOfRise = (s.level - state.prevLevel) * 6;
+      state.prevLevel = state.level;
+      state.level = s.level;
+      state.rain = s.rain;
+      levelSlider.value = s.level;
+      rainSlider.value = s.rain;
+      renderCore();
+      i++;
+    }, 1400);
+  });
+
+  var lastRenderedRiskState = null;
+  function renderCore(forceLogReset){
+    document.getElementById('levelVal').textContent = state.level.toFixed(1) + ' m';
+    document.getElementById('rainVal').textContent = Math.round(state.rain) + ' mm/hr';
+
+    var result = RiskEngine.computeRisk(state.level, state.rain, state.rateOfRise);
+    state.riskState = result.state;
+    var meta = STATE_META[result.state];
+
+    var banner = document.getElementById('riskBanner');
+    banner.className = 'risk-banner ' + meta.cls;
+    document.getElementById('riskIcon').textContent = meta.icon;
+    document.getElementById('riskIcon').className = 'risk-icon ' + meta.textCls;
+    var lbl = document.getElementById('riskLabel');
+    lbl.textContent = meta.label;
+    lbl.className = meta.textCls;
+    document.getElementById('riskSub').textContent = 'Risk score ' + result.score.toFixed(2) + ' — ' + PERSONA_NOTE[state.persona];
+
+    document.getElementById('sirenText').textContent = meta.siren;
+    document.getElementById('sirenPill').classList.toggle('on', result.state !== 'green');
+    document.getElementById('dashText').textContent = meta.dash;
+    document.getElementById('dashPill').classList.toggle('on', result.state !== 'green');
+    document.getElementById('smsPreview').textContent = meta.sms;
+
+    // forecast (deterministic extrapolation, clearly simulated) — rate clamped to a
+    // plausible per-hour rise so a fast slider drag can't produce an absurd projection
+    var forecastRate = Math.min(Math.max(state.rateOfRise, -1.2), 1.2);
+    var clampLevel = function(v){ return Math.min(Math.max(v, 0), 9.5); };
+    document.getElementById('fc1').textContent = clampLevel(state.level + forecastRate*1).toFixed(1) + ' m';
+    document.getElementById('fc3').textContent = clampLevel(state.level + forecastRate*3).toFixed(1) + ' m';
+    document.getElementById('fc6').textContent = clampLevel(state.level + forecastRate*6).toFixed(1) + ' m';
+
+    // shelter occupancy tied to risk state (simulated demand)
+    var occ = {green:0, yellow:50, orange:225, red:450}[result.state];
+    document.getElementById('shelterText').textContent =
+      (result.state==='green' ? 'Standby' : result.state==='yellow' ? 'On alert' : result.state==='orange' ? 'Filling' : 'Near capacity')
+      + ' — ' + occ + ' / 500 capacity in use';
+
+    if (forceLogReset){
+      lastRenderedRiskState = null;
+    }
+    if (lastRenderedRiskState !== result.state){
+      state.coreLog.unshift({ time: nowStr(), text: meta.dashMsg, state: result.state });
+      if (state.coreLog.length > 12) state.coreLog.pop();
+      lastRenderedRiskState = result.state;
+    }
+    renderLog();
+  }
+
+  function renderLog(){
+    var list = document.getElementById('logList');
+    list.innerHTML = '';
+    if (state.coreLog.length === 0){
+      list.appendChild(el('li', {}, [text('No state changes yet — move a slider or run the scenario.')]));
+      return;
+    }
+    state.coreLog.forEach(function(entry){
+      var dotColor = STATE_META[entry.state].color;
+      var dot = el('span', {class:'log-dot', style:'background:'+dotColor});
+      var li = el('li', {}, [ el('time', {}, [text(entry.time)]), dot, el('span', {}, [text(entry.text)]) ]);
+      list.appendChild(li);
+    });
+  }
+
+  /* ===================================================================
+     SHARED TICKET QUEUE RENDERER (used identically by DrainWatch + JalSetu)
+     =================================================================== */
+  function renderTicketQueue(container){
+    container.innerHTML = '';
+    var wrap = el('div', {class:'ticket-queue-wrap'});
+    var openCount = state.tickets.filter(function(t){return t.status==='open';}).length;
+    wrap.appendChild(el('div', {style:'font-size:12px; color:var(--text-muted); font-family:var(--font-mono);'},
+      [text(openCount + ' open · ' + state.tickets.length + ' total this session')]));
+
+    if (state.tickets.length === 0){
+      wrap.appendChild(el('div', {class:'empty-state'}, [text('No tickets yet. Push a sensor value past its threshold to generate one.')]));
+      container.appendChild(wrap);
+      return;
+    }
+
+    var scrollWrap = el('div', {style:'overflow-x:auto;'});
+    var table = el('table', {class:'tickets', style:'min-width:620px;'});
+    var thead = el('thead', {}, [ el('tr', {}, [
+      el('th', {}, [text('ID')]), el('th', {}, [text('Source')]), el('th', {}, [text('Location')]),
+      el('th', {}, [text('Severity')]), el('th', {}, [text('Created')]), el('th', {}, [text('Status')]), el('th', {}, [text('')])
+    ])]);
+    table.appendChild(thead);
+    var tbody = el('tbody');
+    state.tickets.forEach(function(t){
+      var statusClass = t.status === 'open' ? 'status-open' : (t.status === 'resolved' ? 'status-resolved' : 'status-progress');
+      var actionCell;
+      if (t.status === 'open'){
+        actionCell = el('button', {class:'btn small', onclick:function(){ TicketService.resolve(t.id); rerenderTicketsEverywhere(); }}, [text('Mark resolved')]);
+      } else {
+        actionCell = el('span', {style:'color:var(--text-muted); font-size:11.5px;'}, [text('—')]);
+      }
+      var tr = el('tr', {}, [
+        el('td', {class:'mono'}, [text(t.id)]),
+        el('td', {}, [text(t.source)]),
+        el('td', {}, [text(t.location)]),
+        el('td', {}, [text(t.severity)]),
+        el('td', {class:'mono'}, [text(t.created)]),
+        el('td', {}, [ el('span', {class:'status-pill '+statusClass}, [text(t.status.toUpperCase())]) ]),
+        el('td', {}, [actionCell])
+      ]);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    scrollWrap.appendChild(table);
+    wrap.appendChild(scrollWrap);
+    container.appendChild(wrap);
+  }
+  function rerenderTicketsEverywhere(){
+    renderTicketQueue(document.getElementById('drainTicketWrap'));
+    renderTicketQueue(document.getElementById('zoneTicketWrap'));
+  }
+
+  /* ===================================================================
+     DRAINWATCH SCREEN
+     =================================================================== */
+  function renderDrainList(){
+    var list = document.getElementById('drainList');
+    list.innerHTML = '';
+    state.drains.forEach(function(d){
+      var barColor = d.blockage >= DRAIN_THRESHOLD ? 'var(--risk-red)' : d.blockage >= DRAIN_THRESHOLD*0.6 ? 'var(--risk-orange)' : 'var(--risk-green)';
+      var row = el('button', {class:'item-row', 'aria-pressed': String(d.id === state.selectedDrain), type:'button',
+        onclick:function(){ state.selectedDrain = d.id; renderDrainList(); renderDrainControls(); }
+      }, [
+        el('span', {class:'name'}, [text(d.name)]),
+        el('div', {class:'mini-bar'}, [ el('div', {class:'mini-bar-fill', style:'width:'+d.blockage+'%; background:'+barColor}) ]),
+        el('span', {class:'reading'}, [text(Math.round(d.blockage) + '%')])
+      ]);
+      list.appendChild(row);
+    });
+  }
+
+  function renderDrainControls(){
+    var wrap = document.getElementById('drainControls');
+    wrap.innerHTML = '';
+    var d = state.drains.find(function(x){return x.id===state.selectedDrain;});
+    if (!d) return;
+    var label = el('div', {class:'slider-label'}, [
+      el('span', {}, [text('Blockage — ' + d.name)]),
+      el('span', {class:'value mono'}, [text(Math.round(d.blockage) + '%')])
+    ]);
+    var slider = el('input', {type:'range', min:'0', max:'100', step:'1', value:String(d.blockage), 'aria-label':'Blockage percent for ' + d.name});
+    slider.addEventListener('input', function(){
+      d.blockage = parseFloat(slider.value);
+      renderDrainList();
+      renderDrainControls();
+      checkDrainThreshold(d);
+    });
+    var note = el('div', {class:'slider-note'}, [text('Threshold for a maintenance ticket: ' + DRAIN_THRESHOLD + '% (illustrative). Passive self-clearing geometry is a hardware design feature, independent of this sensor reading.')]);
+    var simBtn = el('button', {class:'btn small', style:'margin-top:10px;', type:'button', onclick:function(){
+      d.blockage = Math.min(100, d.blockage + 30 + Math.random()*15);
+      renderDrainList(); renderDrainControls(); checkDrainThreshold(d);
+    }}, [text('⛈ Simulate clog event')]);
+    wrap.appendChild(label);
+    wrap.appendChild(slider);
+    wrap.appendChild(note);
+    wrap.appendChild(simBtn);
+  }
+
+  function checkDrainThreshold(d){
+    if (d.blockage >= DRAIN_THRESHOLD && !TicketService.hasOpenFor(d.name)){
+      TicketService.create('DrainWatch', d.name, d.name, d.blockage >= 85 ? 'High' : 'Medium');
+      rerenderTicketsEverywhere();
+    }
+  }
+
+  /* ===================================================================
+     JALSETU SCREEN
+     =================================================================== */
+  function renderZoneList(){
+    var list = document.getElementById('zoneList');
+    list.innerHTML = '';
+    state.zones.forEach(function(z){
+      var barColor = z.anomaly >= ZONE_THRESHOLD ? 'var(--risk-red)' : z.anomaly >= ZONE_THRESHOLD*0.6 ? 'var(--risk-orange)' : 'var(--risk-green)';
+      var row = el('button', {class:'item-row', 'aria-pressed': String(z.id === state.selectedZone), type:'button',
+        onclick:function(){ state.selectedZone = z.id; renderZoneList(); renderZoneControls(); }
+      }, [
+        el('span', {class:'name'}, [text(z.name)]),
+        el('div', {class:'mini-bar'}, [ el('div', {class:'mini-bar-fill', style:'width:'+z.anomaly+'%; background:'+barColor}) ]),
+        el('span', {class:'reading'}, [text(Math.round(z.anomaly) + '%')])
+      ]);
+      list.appendChild(row);
+    });
+  }
+
+  function renderZoneControls(){
+    var wrap = document.getElementById('zoneControls');
+    wrap.innerHTML = '';
+    var z = state.zones.find(function(x){return x.id===state.selectedZone;});
+    if (!z) return;
+    var label = el('div', {class:'slider-label'}, [
+      el('span', {}, [text('Pressure/flow anomaly — ' + z.name)]),
+      el('span', {class:'value mono'}, [text(Math.round(z.anomaly) + '%')])
+    ]);
+    var slider = el('input', {type:'range', min:'0', max:'100', step:'1', value:String(z.anomaly), 'aria-label':'Anomaly percent for ' + z.name});
+    slider.addEventListener('input', function(){
+      z.anomaly = parseFloat(slider.value);
+      renderZoneList();
+      renderZoneControls();
+      checkZoneThreshold(z);
+    });
+    var note = el('div', {class:'slider-note'}, [text('Threshold for an action ticket: ' + ZONE_THRESHOLD + '% (illustrative). Localization resolution is zone-level only — not pipe-exact.')]);
+    var simBtn = el('button', {class:'btn small', style:'margin-top:10px;', type:'button', onclick:function(){
+      z.anomaly = Math.min(100, z.anomaly + 30 + Math.random()*15);
+      renderZoneList(); renderZoneControls(); checkZoneThreshold(z);
+    }}, [text('💧 Simulate pressure anomaly')]);
+    wrap.appendChild(label);
+    wrap.appendChild(slider);
+    wrap.appendChild(note);
+    wrap.appendChild(simBtn);
+  }
+
+  function checkZoneThreshold(z){
+    if (z.anomaly >= ZONE_THRESHOLD && !TicketService.hasOpenFor(z.name)){
+      TicketService.create('JalSetu', z.name, z.name.split(' — ')[0] + ' (zone-level)', z.anomaly >= 85 ? 'High' : 'Medium');
+      rerenderTicketsEverywhere();
+    }
+  }
+
+  /* ===================================================================
+     INFO PAGE — feasibility scorecard render
+     =================================================================== */
+  function renderScorecard(){
+    var rows = [
+      {label:'Scientific Feasibility', score:8.5},
+      {label:'Technical Feasibility (MVP)', score:9.0},
+      {label:'Economic Feasibility', score:7.0},
+      {label:'Market / Need Potential', score:8.5},
+      {label:'Novelty', score:5.5},
+      {label:'Student Execution Feasibility', score:9.0},
+      {label:'Overall Opportunity', score:7.5}
+    ];
+    var wrap = document.getElementById('scoreRows');
+    wrap.innerHTML = '';
+    rows.forEach(function(r){
+      var row = el('div', {class:'score-row'}, [
+        el('div', {class:'label'}, [text(r.label)]),
+        el('div', {class:'score-track'}, [ el('div', {class:'score-fill', style:'width:'+(r.score*10)+'%'}) ]),
+        el('div', {class:'score-val'}, [text(r.score.toFixed(1))])
+      ]);
+      wrap.appendChild(row);
+    });
+  }
+
+  /* ===================================================================
+     INIT
+     =================================================================== */
+  renderCore(true);
+  renderDrainList();
+  renderDrainControls();
+  renderZoneList();
+  renderZoneControls();
+  rerenderTicketsEverywhere();
+  renderScorecard();
+  showTab('overview');
+
+})();
+</script>
+</body>
+</html>
