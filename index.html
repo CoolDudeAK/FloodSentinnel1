@@ -303,6 +303,28 @@
   .rvf-col li{margin-bottom:6px;}
 
   footer{border-top:1px solid var(--border-soft); padding:26px 0; text-align:center; color:var(--text-muted); font-size:12px;}
+  /* ---------- Hardware tab ---------- */
+  .hw-vals{font-size:12px; color:var(--text-secondary); line-height:1.7; min-height:68px; margin:6px 0;}
+  .hw-raw{font-size:10.5px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:6px;}
+  .hw-spark{background:var(--bg-panel-alt); border:1px solid var(--border-soft); border-radius:8px; padding:10px 12px;}
+  .hw-spark .t{display:flex; justify-content:space-between; font-size:12px; font-weight:600;}
+  .hw-spark .t b{font-family:var(--font-mono); color:var(--cyan-bright); font-weight:600;}
+  .hw-spark canvas{width:100%; height:54px; display:block; margin-top:6px;}
+  .hw-con{background:#050c14; border:1px solid var(--border-soft); border-radius:8px; color:var(--green); font-family:var(--font-mono); font-size:11px; padding:10px; height:200px; overflow:auto; margin:0; white-space:pre-wrap; word-break:break-all;}
+  .hw-form{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:10px;}
+  .hw-form label{font-size:11.5px; color:var(--text-secondary); display:flex; flex-direction:column; gap:3px;}
+  .hw-form input, .hw-ctl select, .hw-ctl input{background:var(--bg-void); color:var(--text-primary); border:1px solid var(--border-soft); border-radius:6px; padding:6px 8px; font-family:var(--font-mono); font-size:12.5px; max-width:100%;}
+  .hw-ctl{display:flex; gap:12px; flex-wrap:wrap; align-items:center;}
+  .hw-ctl label{font-size:12px; color:var(--text-secondary); display:flex; align-items:center; gap:6px;}
+  .hw-steps{margin:0; padding-left:20px; color:var(--text-secondary); font-size:13.5px; line-height:1.8;}
+  .hw-steps b{color:var(--text-primary);}
+  .hw-fw{background:#050c14; border:1px solid var(--border-soft); border-radius:8px; color:var(--text-secondary); font-family:var(--font-mono); font-size:11px; padding:12px; max-height:320px; overflow:auto; margin:10px 0 0; white-space:pre;}
+  .ckt{--ink:#EAF3FA; --mut:#A8C0D3; --box:#0f2940; --ln:#4a6a84; --p:#ff7b6b; --g:#aebcb8; --s:#6bb6f5;}
+  .ckt .dg{overflow-x:auto; border:1px solid var(--border-soft); background:var(--box); border-radius:8px; margin:8px 0;}
+  .ckt .dg svg{display:block; min-width:640px; width:100%; height:auto;}
+  .ckt text{font-family:var(--font-mono); fill:var(--ink);}
+  .ckt ul{color:var(--text-secondary); font-size:12.5px; line-height:1.6;}
+  .ckt h4{margin:18px 0 2px; font-size:14px;}
 </style>
 </head>
 <body>
@@ -321,8 +343,10 @@
       <button data-tab="core" aria-selected="false">FloodSentinel Core</button>
       <button data-tab="drainwatch" aria-selected="false">DrainWatch</button>
       <button data-tab="jalsetu" aria-selected="false">JalSetu</button>
+      <button data-tab="hardware" aria-selected="false">🔌 Hardware</button>
       <button data-tab="info" aria-selected="false">Info &amp; Sources</button>
     </nav>
+    <span class="badge info" id="hwChip">Hardware: not connected</span>
     <button class="howworks-btn" id="openDrawerBtn" type="button">❓ How this works</button>
   </div>
 </div>
@@ -533,6 +557,86 @@
   </section>
 
   <!-- ============ INFO & SOURCES ============ -->
+  <section class="screen hidden" id="screen-hardware">
+    <div class="page-head">
+      <h2>Hardware Link</h2>
+      <p class="lede">Connect the ESP32 nodes by USB, watch the real sensor readings arrive, and let them drive the Core, DrainWatch and JalSetu screens. Each node card shows whether its data is live from hardware or simulated.</p>
+      <div class="badge-row">
+        <span class="badge real">REAL: USB serial link, parsing, scaling, risk logic</span>
+        <span class="badge sim">SIMULATED: only when you switch the demo feed on</span>
+        <span class="badge info">Chrome or Edge on a computer</span>
+      </div>
+    </div>
+    <div class="card" id="hwUnsupported" style="display:none; margin-bottom:18px; border-color:var(--border-orange);">
+      <h3>This browser cannot talk to USB devices</h3>
+      <p>Web Serial is only available in Chrome and Edge on a computer. Open this file there. You can still use the simulated feed below.</p>
+    </div>
+    <div class="grid grid-3" id="hwNodes"></div>
+    <div class="card" style="margin-top:18px;">
+      <h3><span class="icon">⚙</span> Link settings</h3>
+      <div class="hw-ctl">
+        <label>Baud rate <select id="hwBaud"><option>115200</option><option>9600</option><option>57600</option></select></label>
+        <label><input type="checkbox" id="hwSimOn"> Simulated demo feed (no hardware)</label>
+        <label>Scenario <select id="hwScenario"><option value="normal">Normal</option><option value="flood">Flood rising</option><option value="blocked">Drain blocked</option><option value="leak">Pipe leak</option><option value="all">All three</option></select></label>
+      </div>
+      <p class="slider-note" style="margin-top:8px;">A node with fresh data from a real USB port always takes priority over the simulated feed. Simulated lines go through the same parser as real ones.</p>
+    </div>
+    <h3 style="margin:22px 0 10px;">Live readings</h3>
+    <div class="grid grid-3" id="hwSpark"></div>
+    <div class="grid grid-2" style="margin-top:18px;">
+      <div class="card">
+        <h3><span class="icon">▤</span> Serial console</h3>
+        <pre class="hw-con" id="hwCon"></pre>
+        <div class="hw-ctl" style="margin-top:10px;">
+          <select id="hwCmdNode"><option value="CORE">Core</option><option value="DRAIN">DrainWatch</option><option value="JAL">JalSetu</option></select>
+          <input id="hwCmd" placeholder="e.g. RISK,2" style="flex:1; min-width:120px;">
+          <button class="btn small" type="button" id="hwSend">Send</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3><span class="icon">🎚</span> Calibration</h3>
+        <div class="hw-form" id="hwCal"></div>
+        <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn small" type="button" id="hwBase">Capture JalSetu "normal" now</button>
+          <button class="btn small ghost" type="button" id="hwCalReset">Reset all</button>
+        </div>
+        <p class="slider-note" id="hwBaseNote"></p>
+        <p class="slider-note">Heights are measured from each ultrasonic sensor face down to the empty tank or drain floor. Thresholds are illustrative until you calibrate with your own dry, wet, blocked and leaking runs.</p>
+      </div>
+    </div>
+    <div class="card ckt" style="margin-top:18px;">
+      <h3><span class="icon">🔌</span> Wiring: full circuits</h3>
+      <p class="slider-note">Not bench-tested. Check every voltage with a multimeter before connecting the ESP32.</p>
+      <h4>1. Core node</h4><div class="dg"><svg id="ckt-core"></svg></div><ul id="ckt-core-n"></ul>
+      <h4>2. DrainWatch</h4><div class="dg"><svg id="ckt-dw"></svg></div><ul id="ckt-dw-n"></ul>
+      <h4>3. JalSetu</h4><div class="dg"><svg id="ckt-js"></svg></div><ul id="ckt-js-n"></ul>
+    </div>
+    <div class="card" style="margin-top:18px;">
+      <h3><span class="icon">⬇</span> Firmware (Arduino sketches)</h3>
+      <div class="hw-ctl">
+        <button class="btn small" type="button" data-fw="CORE">Core</button>
+        <button class="btn small" type="button" data-fw="DRAIN">DrainWatch</button>
+        <button class="btn small" type="button" data-fw="JAL">JalSetu</button>
+        <span style="flex:1"></span>
+        <button class="btn small primary" type="button" id="fwCopy">Copy</button>
+        <button class="btn small" type="button" id="fwDown">Download .ino</button>
+      </div>
+      <pre class="hw-fw" id="fwCode"></pre>
+    </div>
+    <div class="card" style="margin-top:18px;">
+      <h3><span class="icon">☰</span> First-time setup, step by step</h3>
+      <ol class="hw-steps">
+        <li><b>Install Arduino IDE 2</b> from arduino.cc. In <b>Boards Manager</b> install <b>esp32 by Espressif Systems</b>. If no port appears when you plug in the ESP32, install the CP210x or CH340 USB driver.</li>
+        <li><b>Download a sketch</b> above. Keep the folder name equal to the file name, for example <span class="mono">FloodSentinel_Core/FloodSentinel_Core.ino</span>. For Core only, install the library <b>ESP32Servo</b> (Tools, Manage Libraries).</li>
+        <li><b>Upload:</b> Tools, Board, <b>ESP32 Dev Module</b>; pick the port; click Upload. If it stalls on "Connecting...", hold the BOOT button on the ESP32 until upload starts.</li>
+        <li><b>Close the Arduino Serial Monitor.</b> Only one program can use the port, and an open monitor is the most common reason for a failed connect.</li>
+        <li><b>Open this HTML file by double-click in Chrome or Edge</b>, go to this tab, press <b>Connect</b> on the node card and choose the COM port. The ESP32 restarts when the port opens, so wait about 2 seconds. The card turns LIVE HARDWARE.</li>
+        <li><b>Calibrate</b> the heights and dry/wet values above, then run your real tests: raise the water, block the drain inlet, open a tap to fake a leak.</li>
+      </ol>
+      <p class="slider-note"><b>Honest limits:</b> the OLED and SIM800L SMS are in the circuit but not driven by this firmware. Rain is shown as a 0 to 100 index, not true mm/hr, until calibrated against a real gauge. The dashboard's forecast is still simple extrapolation.</p>
+    </div>
+  </section>
+
   <section class="screen hidden" id="screen-info">
     <div class="page-head">
       <h2>Info &amp; Sources</h2>
@@ -888,7 +992,7 @@
   /* ===================================================================
      TAB NAVIGATION
      =================================================================== */
-  var tabs = ['overview','core','drainwatch','jalsetu','info'];
+  var tabs = ['overview','core','drainwatch','jalsetu','hardware','info'];
   function showTab(name){
     if (tabs.indexOf(name) === -1) return;
     state.activeTab = name;
@@ -1129,7 +1233,7 @@
       var row = el('button', {class:'item-row', 'aria-pressed': String(d.id === state.selectedDrain), type:'button',
         onclick:function(){ state.selectedDrain = d.id; renderDrainList(); renderDrainControls(); }
       }, [
-        el('span', {class:'name'}, [text(d.name)]),
+        el('span', {class:'name'}, [text(d.name + (d.live ? '  ● LIVE' : ''))]),
         el('div', {class:'mini-bar'}, [ el('div', {class:'mini-bar-fill', style:'width:'+d.blockage+'%; background:'+barColor}) ]),
         el('span', {class:'reading'}, [text(Math.round(d.blockage) + '%')])
       ]);
@@ -1162,6 +1266,7 @@
     wrap.appendChild(slider);
     wrap.appendChild(note);
     wrap.appendChild(simBtn);
+    if (d.live){ slider.disabled = true; simBtn.disabled = true; note.textContent = 'Live from DrainWatch hardware. Calibrate on the Hardware tab.'; }
   }
 
   function checkDrainThreshold(d){
@@ -1182,7 +1287,7 @@
       var row = el('button', {class:'item-row', 'aria-pressed': String(z.id === state.selectedZone), type:'button',
         onclick:function(){ state.selectedZone = z.id; renderZoneList(); renderZoneControls(); }
       }, [
-        el('span', {class:'name'}, [text(z.name)]),
+        el('span', {class:'name'}, [text(z.name + (z.live ? '  ● LIVE' : ''))]),
         el('div', {class:'mini-bar'}, [ el('div', {class:'mini-bar-fill', style:'width:'+z.anomaly+'%; background:'+barColor}) ]),
         el('span', {class:'reading'}, [text(Math.round(z.anomaly) + '%')])
       ]);
@@ -1215,6 +1320,7 @@
     wrap.appendChild(slider);
     wrap.appendChild(note);
     wrap.appendChild(simBtn);
+    if (z.live){ slider.disabled = true; simBtn.disabled = true; note.textContent = 'Live from JalSetu hardware. Calibrate on the Hardware tab.'; }
   }
 
   function checkZoneThreshold(z){
@@ -1250,6 +1356,372 @@
   }
 
   /* ===================================================================
+     HARDWARE LINK  (Web Serial -> parse -> scale -> dashboard state)
+     Line protocol from the ESP32 sketches (115200 baud, one line each):
+       CORE,dist_cm,rain_raw,float,state
+       DRAIN,up_cm,down_cm,flow_lpm,float
+       JAL,p1_kpa,p2_kpa,f1_lpm,f2_lpm
+     Dashboard -> ESP32:  RISK,n
+     =================================================================== */
+  var FIRMWARE = {"CORE": {"file": "FloodSentinel_Core.ino", "code": "// FloodSentinel CORE node (ESP32). Pins match the circuit diagram.\n// Library needed: \"ESP32Servo\" (Arduino IDE > Library Manager). OLED and SIM800L are NOT driven here.\n// Prints: CORE,<dist_cm>,<rain_raw>,<float 1=water high>,<state 0-3>   at 115200 baud\n// Accepts: RISK,<0-3> from the dashboard (0 safe,1 advisory,2 warning,3 evacuate)\n#include <ESP32Servo.h>\nconst int TRIG = 23, ECHO = 18, RAIN = 34, FLOATSW = 27;\nconst int RELAY_SIREN = 26, RELAY_PUMP = 25, SERVO_PIN = 13;\nconst int LEDS[4] = {32, 33, 14, 4};          // green, yellow, orange, red\nServo gate;\nint state = 0;\nunsigned long lastCmd = 0, lastTx = 0;\nString rx;\n\nfloat readCm() {                               // median of 3 echo readings; -1 = no echo\n  float v[3];\n  for (int i = 0; i < 3; i++) {\n    digitalWrite(TRIG, LOW); delayMicroseconds(4);\n    digitalWrite(TRIG, HIGH); delayMicroseconds(15); digitalWrite(TRIG, LOW);\n    unsigned long d = pulseIn(ECHO, HIGH, 30000);\n    v[i] = d ? d * 0.0343f / 2.0f : -1;\n    delay(30);\n  }\n  if (v[0] > v[1]) { float t = v[0]; v[0] = v[1]; v[1] = t; }\n  if (v[1] > v[2]) { float t = v[1]; v[1] = v[2]; v[2] = t; }\n  if (v[0] > v[1]) { float t = v[0]; v[0] = v[1]; v[1] = t; }\n  return v[1];\n}\n\nvoid applyOutputs() {\n  for (int i = 0; i < 4; i++) digitalWrite(LEDS[i], i == state);\n  bool siren = (state == 3) || (state == 2 && (millis() / 500) % 2);\n  digitalWrite(RELAY_SIREN, siren ? LOW : HIGH);   // relay modules trigger on LOW\n  digitalWrite(RELAY_PUMP, state >= 2 ? LOW : HIGH);\n  gate.write(state >= 2 ? 90 : 0);                 // sluice gate\n}\n\nvoid setup() {\n  Serial.begin(115200);\n  pinMode(TRIG, OUTPUT); pinMode(ECHO, INPUT); pinMode(FLOATSW, INPUT_PULLUP);\n  pinMode(RELAY_SIREN, OUTPUT); pinMode(RELAY_PUMP, OUTPUT);\n  digitalWrite(RELAY_SIREN, HIGH); digitalWrite(RELAY_PUMP, HIGH);\n  for (int i = 0; i < 4; i++) pinMode(LEDS[i], OUTPUT);\n  gate.attach(SERVO_PIN);\n  analogReadResolution(12);\n}\n\nvoid loop() {\n  while (Serial.available()) {                     // read commands from dashboard\n    char c = Serial.read();\n    if (c == '\\n') {\n      if (rx.startsWith(\"RISK,\")) { state = constrain(rx.substring(5).toInt(), 0, 3); lastCmd = millis(); }\n      rx = \"\";\n    } else if (c != '\\r' && rx.length() < 40) rx += c;\n  }\n  bool waterHigh = digitalRead(FLOATSW) == LOW;    // closed switch = water high\n  if (millis() - lastCmd > 15000) state = waterHigh ? 3 : 0;   // dashboard silent: float-switch fallback\n  applyOutputs();\n  if (millis() - lastTx >= 500) {\n    lastTx = millis();\n    Serial.printf(\"CORE,%.1f,%d,%d,%d\\n\", readCm(), analogRead(RAIN), waterHigh ? 1 : 0, state);\n  }\n}\n"}, "DRAIN": {"file": "FloodSentinel_DrainWatch.ino", "code": "// FloodSentinel DRAINWATCH node (ESP32). Pins match the circuit diagram. No extra libraries needed.\n// Prints: DRAIN,<up_cm>,<down_cm>,<flow_lpm>,<float 1=overflow>   at 115200 baud\n// Accepts: RISK,<0-2> from the dashboard (0 clear, 1 partial, 2 blocked)\nconst int TRIG1 = 23, ECHO1 = 18, TRIG2 = 19, ECHO2 = 21, FLOWPIN = 27, FLOATSW = 14, BUZZ = 26;\nconst int LED_G = 32, LED_Y = 33, LED_R = 25;\nvolatile unsigned long pulses = 0;\nvoid IRAM_ATTR onPulse() { pulses++; }\nint state = 0;\nunsigned long lastCmd = 0, lastTx = 0, lastFlow = 0;\nString rx;\n\nfloat readCm(int trig, int echo) {\n  float v[3];\n  for (int i = 0; i < 3; i++) {\n    digitalWrite(trig, LOW); delayMicroseconds(4);\n    digitalWrite(trig, HIGH); delayMicroseconds(15); digitalWrite(trig, LOW);\n    unsigned long d = pulseIn(echo, HIGH, 30000);\n    v[i] = d ? d * 0.0343f / 2.0f : -1;\n    delay(30);\n  }\n  if (v[0] > v[1]) { float t = v[0]; v[0] = v[1]; v[1] = t; }\n  if (v[1] > v[2]) { float t = v[1]; v[1] = v[2]; v[2] = t; }\n  if (v[0] > v[1]) { float t = v[0]; v[0] = v[1]; v[1] = t; }\n  return v[1];\n}\n\nvoid setup() {\n  Serial.begin(115200);\n  pinMode(TRIG1, OUTPUT); pinMode(ECHO1, INPUT); pinMode(TRIG2, OUTPUT); pinMode(ECHO2, INPUT);\n  pinMode(FLOWPIN, INPUT); pinMode(FLOATSW, INPUT_PULLUP);\n  pinMode(BUZZ, OUTPUT); pinMode(LED_G, OUTPUT); pinMode(LED_Y, OUTPUT); pinMode(LED_R, OUTPUT);\n  attachInterrupt(digitalPinToInterrupt(FLOWPIN), onPulse, FALLING);\n  lastFlow = millis();\n}\n\nvoid loop() {\n  while (Serial.available()) {\n    char c = Serial.read();\n    if (c == '\\n') {\n      if (rx.startsWith(\"RISK,\")) { state = constrain(rx.substring(5).toInt(), 0, 2); lastCmd = millis(); }\n      rx = \"\";\n    } else if (c != '\\r' && rx.length() < 40) rx += c;\n  }\n  bool overflow = digitalRead(FLOATSW) == LOW;\n  if (millis() - lastCmd > 15000) state = overflow ? 2 : 0;    // dashboard silent: float fallback\n  digitalWrite(LED_G, state == 0); digitalWrite(LED_Y, state == 1); digitalWrite(LED_R, state == 2);\n  digitalWrite(BUZZ, state == 2 && (millis() / 400) % 2);\n  if (millis() - lastTx >= 1000) {\n    lastTx = millis();\n    noInterrupts(); unsigned long p = pulses; pulses = 0; interrupts();\n    float secs = (millis() - lastFlow) / 1000.0f; lastFlow = millis();\n    float lpm = (p / secs) / 7.5f;                 // YF-S201: Hz = 7.5 x L/min\n    float up = readCm(TRIG1, ECHO1), down = readCm(TRIG2, ECHO2);\n    Serial.printf(\"DRAIN,%.1f,%.1f,%.2f,%d\\n\", up, down, lpm, overflow ? 1 : 0);\n  }\n}\n"}, "JAL": {"file": "FloodSentinel_JalSetu.ino", "code": "// FloodSentinel JALSETU node (ESP32). Pins match the circuit diagram. No extra libraries needed.\n// Pressure sensor assumed 0.5-4.5 V = 0-1200 kPa (0-1.2 MPa) behind a 10k/20k divider. Change PMAX_KPA for other ranges.\n// Prints: JAL,<p1_kpa>,<p2_kpa>,<f1_lpm>,<f2_lpm>   at 115200 baud\n// Accepts: RISK,<0-2> from the dashboard (0 normal, 1 anomaly, 2 leak -> isolation valve closes)\nconst int P1 = 34, P2 = 35, F1PIN = 25, F2PIN = 26, VALVE = 27;\nconst int LED_G = 32, LED_Y = 33, LED_R = 4;\nconst float PMAX_KPA = 1200.0f;\nvolatile unsigned long c1 = 0, c2 = 0;\nvoid IRAM_ATTR on1() { c1++; }\nvoid IRAM_ATTR on2() { c2++; }\nint state = 0;\nunsigned long lastCmd = 0, lastTx = 0, lastFlow = 0;\nString rx;\n\nfloat readKpa(int pin) {\n  long mv = 0;\n  for (int i = 0; i < 16; i++) { mv += analogReadMilliVolts(pin); delay(2); }\n  float vsig = (mv / 16.0f) * 1.5f / 1000.0f;      // undo the 10k+20k divider (x1.5)\n  float kpa = (vsig - 0.5f) / 4.0f * PMAX_KPA;\n  return kpa < 0 ? 0 : kpa;\n}\n\nvoid setup() {\n  Serial.begin(115200);\n  pinMode(F1PIN, INPUT); pinMode(F2PIN, INPUT);\n  pinMode(VALVE, OUTPUT); digitalWrite(VALVE, LOW);           // LOW = relay on = valve open\n  pinMode(LED_G, OUTPUT); pinMode(LED_Y, OUTPUT); pinMode(LED_R, OUTPUT);\n  attachInterrupt(digitalPinToInterrupt(F1PIN), on1, FALLING);\n  attachInterrupt(digitalPinToInterrupt(F2PIN), on2, FALLING);\n  analogReadResolution(12);\n  lastFlow = millis();\n}\n\nvoid loop() {\n  while (Serial.available()) {\n    char c = Serial.read();\n    if (c == '\\n') {\n      if (rx.startsWith(\"RISK,\")) { state = constrain(rx.substring(5).toInt(), 0, 2); lastCmd = millis(); }\n      rx = \"\";\n    } else if (c != '\\r' && rx.length() < 40) rx += c;\n  }\n  if (millis() - lastCmd > 15000) state = 0;                  // dashboard silent: fail-open\n  digitalWrite(LED_G, state == 0); digitalWrite(LED_Y, state == 1); digitalWrite(LED_R, state == 2);\n  digitalWrite(VALVE, state == 2 ? HIGH : LOW);               // HIGH = relay off = valve closed (demo behaviour)\n  if (millis() - lastTx >= 1000) {\n    lastTx = millis();\n    noInterrupts(); unsigned long a = c1, b = c2; c1 = 0; c2 = 0; interrupts();\n    float secs = (millis() - lastFlow) / 1000.0f; lastFlow = millis();\n    Serial.printf(\"JAL,%.1f,%.1f,%.2f,%.2f\\n\", readKpa(P1), readKpa(P2), (a / secs) / 7.5f, (b / secs) / 7.5f);\n  }\n}\n"}};
+  var HW_DEF = {coreH:100, coreFull:80, rainDry:4000, rainWet:1500, drUpH:60, drDnH:60, drHead:20, drFlow:10, drMin:3, jDef:0.30, jDp:50, jMin:1, jBaseDef:0, jBaseDp:0};
+  var HW_CAL_SPEC = [
+    ['coreH','Core: sensor height above empty tank floor (cm)',1],
+    ['coreFull','Core: water depth that counts as the 8 m flood scale (cm)',1],
+    ['rainDry','Rain sensor raw reading when dry (0-4095)',10],
+    ['rainWet','Rain sensor raw reading when soaked (0-4095)',10],
+    ['drUpH','DrainWatch: upstream sensor height above floor (cm)',1],
+    ['drDnH','DrainWatch: downstream sensor height above floor (cm)',1],
+    ['drHead','DrainWatch: level difference = fully blocked (cm)',1],
+    ['drFlow','DrainWatch: normal outlet flow (L/min)',0.5],
+    ['drMin','DrainWatch: minimum water depth to judge (cm)',0.5],
+    ['jDef','JalSetu: flow loss counted as full anomaly (0-1)',0.05],
+    ['jDp','JalSetu: extra pressure drop = full anomaly (kPa)',5],
+    ['jMin','JalSetu: minimum inlet flow to judge (L/min)',0.5]
+  ];
+  var hwCal = (function(){ var c = Object.assign({}, HW_DEF); try { var s = localStorage.getItem('fs_hw_cal'); if (s) Object.assign(c, JSON.parse(s)); } catch(e){} return c; })();
+  function hwSaveCal(){ try { localStorage.setItem('fs_hw_cal', JSON.stringify(hwCal)); } catch(e){} }
+  function clamp(v,a,b){ return Math.min(Math.max(v,a),b); }
+
+  var HW_KEYS = ['CORE','DRAIN','JAL'];
+  var HW_LABEL = {CORE:'FloodSentinel Core', DRAIN:'DrainWatch', JAL:'JalSetu'};
+  var hw = {};
+  HW_KEYS.forEach(function(k){ hw[k] = {port:null, reader:null, writer:null, connected:false, live:false, source:null, lastSeen:0, raw:'', msg:'', lastRisk:-1, lastSent:0, vals:{}}; });
+  var hwHist = {}, hwVals = {}, hwLog = [], hwDirty = true, hwLogDirty = true;
+  var HW_METRICS = [
+    ['depth','CORE','Water depth','cm'], ['rain','CORE','Rain index','0-100'],
+    ['upH','DRAIN','Upstream depth','cm'], ['dnH','DRAIN','Downstream depth','cm'], ['dflow','DRAIN','Outlet flow','L/min'], ['block','DRAIN','Blockage score','%'],
+    ['p1','JAL','Pressure P1 (inlet)','kPa'], ['p2','JAL','Pressure P2 (zone end)','kPa'], ['f1','JAL','Flow F1 (inlet)','L/min'], ['f2','JAL','Flow F2 (zone end)','L/min'], ['anom','JAL','Leak anomaly score','%']
+  ];
+  function hwPush(id, v){ hwVals[id] = v; var h = hwHist[id] || (hwHist[id] = []); h.push(v); if (h.length > 120) h.shift(); }
+
+  /* ---- sensor values -> dashboard state ---- */
+  var coreS = null, coreTrail = [];
+  function hwCore(v){
+    var n = hw.CORE, span = hwCal.rainDry - hwCal.rainWet;
+    var rainIdx = span !== 0 ? clamp((hwCal.rainDry - v[1]) / span, 0, 1) * 100 : 0;
+    hwPush('rain', rainIdx);
+    if (v[0] < 0){ n.msg = 'No echo from the ultrasonic sensor (closer than ~25 cm, too far, or a wiring fault).'; return; }
+    var depth = Math.max(0, hwCal.coreH - v[0]);
+    var lvl = clamp(depth / hwCal.coreFull * 8, 0, 8);
+    coreS = coreS === null ? lvl : coreS + 0.3 * (lvl - coreS);
+    hwPush('depth', depth);
+    var now = Date.now(); coreTrail.push({t:now, l:coreS});
+    while (coreTrail.length && now - coreTrail[0].t > 10000) coreTrail.shift();
+    var rate = 0, o = coreTrail[0], dt = (now - o.t) / 1000;
+    if (dt >= 2 && Math.abs(coreS - o.l) >= 0.2) rate = (coreS - o.l) / dt * 360; // bench time: 10 s stands in for 1 h
+    stopScenario();
+    state.prevLevel = state.level; state.level = coreS; state.rain = rainIdx; state.rateOfRise = rate;
+    levelSlider.value = coreS; rainSlider.value = rainIdx;
+    levelSlider.disabled = true; rainSlider.disabled = true; document.getElementById('runScenarioBtn').disabled = true;
+    renderCore();
+    n.vals = {lvl:coreS, flt:v[2], dev:v[3]};
+  }
+  function hwDrain(v){
+    var n = hw.DRAIN;
+    if (v[0] < 0 || v[1] < 0){ n.msg = 'No echo from one of the two ultrasonic sensors.'; return; }
+    var upH = Math.max(0, hwCal.drUpH - v[0]), dnH = Math.max(0, hwCal.drDnH - v[1]);
+    var head = clamp((upH - dnH) / hwCal.drHead, 0, 1), low = 1 - clamp(v[2] / hwCal.drFlow, 0, 1);
+    var b = upH < hwCal.drMin ? 0 : 100 * (0.5 * head + 0.5 * low);
+    hwPush('upH', upH); hwPush('dnH', dnH); hwPush('dflow', v[2]); hwPush('block', b);
+    var d = state.drains[0]; d.blockage = b; d.live = true;
+    renderDrainList(); renderDrainControls(); checkDrainThreshold(d);
+    n.vals = {flt:v[3], dry:upH < hwCal.drMin};
+  }
+  function hwJal(v){
+    var n = hw.JAL, idle = v[2] < hwCal.jMin;
+    var def = idle ? 0 : (v[2] - v[3]) / v[2], dp = v[0] - v[1];
+    var a = idle ? 0 : 100 * (0.6 * clamp((def - hwCal.jBaseDef) / hwCal.jDef, 0, 1) + 0.4 * clamp((dp - hwCal.jBaseDp) / hwCal.jDp, 0, 1));
+    hwPush('p1', v[0]); hwPush('p2', v[1]); hwPush('f1', v[2]); hwPush('f2', v[3]); hwPush('anom', a);
+    var z = state.zones[0]; z.anomaly = a; z.live = true;
+    renderZoneList(); renderZoneControls(); checkZoneThreshold(z);
+    n.vals = {def:def, dp:dp, idle:idle};
+  }
+
+  function hwSetLive(k, on){
+    var n = hw[k]; if (n.live === on) return;
+    n.live = on; hwDirty = true;
+    if (on) return;
+    if (k === 'DRAIN'){ state.drains[0].live = false; renderDrainList(); renderDrainControls(); }
+    if (k === 'JAL'){ state.zones[0].live = false; renderZoneList(); renderZoneControls(); }
+    if (k === 'CORE'){ levelSlider.disabled = false; rainSlider.disabled = false; document.getElementById('runScenarioBtn').disabled = false; coreS = null; coreTrail = []; }
+  }
+
+  function hwRiskFor(k){
+    if (k === 'CORE') return {green:0, yellow:1, orange:2, red:3}[state.riskState];
+    var x = k === 'DRAIN' ? state.drains[0].blockage : state.zones[0].anomaly, th = k === 'DRAIN' ? DRAIN_THRESHOLD : ZONE_THRESHOLD;
+    return x >= th ? 2 : (x >= th * 0.6 ? 1 : 0);
+  }
+  function hwWrite(card, str){ var n = hw[card]; if (!n || !n.writer) return false; n.writer.write(new TextEncoder().encode(str + '\n')).catch(function(){}); return true; }
+  function hwSendRisk(card, k){
+    var n = hw[card]; if (!n.writer) return;
+    var r = hwRiskFor(k), now = Date.now();
+    if (r !== n.lastRisk || now - n.lastSent > 2000){ n.lastRisk = r; n.lastSent = now; hwWrite(card, 'RISK,' + r); }
+  }
+
+  function hwHandleLine(line, src){
+    if (!line) return;
+    hwLog.push((src === 'sim' ? '[sim] ' : '< ') + line); if (hwLog.length > 80) hwLog.shift(); hwLogDirty = true;
+    var p = line.split(','), k = p[0];
+    if (HW_KEYS.indexOf(k) < 0) return;
+    var v = p.slice(1).map(Number);
+    if (v.length !== 4 || v.some(function(x){ return !isFinite(x); })){ hw[k].msg = 'Malformed line ignored.'; hwDirty = true; return; }
+    var n = hw[k];
+    n.lastSeen = Date.now(); n.raw = line; n.source = src === 'sim' ? 'sim' : 'serial'; n.msg = '';
+    if (src !== 'sim' && src !== k) hw[src].msg = 'This port is sending ' + HW_LABEL[k] + ' data. Wrong sketch or wrong card?';
+    if (k === 'CORE') hwCore(v); else if (k === 'DRAIN') hwDrain(v); else hwJal(v);
+    hwSetLive(k, true);
+    if (src !== 'sim') hwSendRisk(src, k);
+    hwDirty = true;
+  }
+
+  /* ---- Web Serial ---- */
+  async function hwConnect(k){
+    var n = hw[k];
+    if (!('serial' in navigator)){ n.msg = 'No Web Serial in this browser. Use Chrome or Edge on a computer.'; hwDirty = true; return; }
+    try {
+      var port = await navigator.serial.requestPort();
+      await port.open({baudRate: parseInt(document.getElementById('hwBaud').value, 10)});
+      n.port = port; n.connected = true; n.writer = port.writable.getWriter();
+      n.msg = 'Connected. Waiting for data (the ESP32 restarts when the port opens, about 2 s).';
+      hwReadLoop(k);
+    } catch(e){
+      var nm = e && e.name;
+      n.msg = nm === 'NotFoundError' ? 'No port selected.'
+        : (nm === 'InvalidStateError' || nm === 'NetworkError') ? 'Port busy or failed to open. Close the Arduino Serial Monitor and any other program using it, then retry.'
+        : nm === 'SecurityError' ? 'Serial access blocked. Open this file directly in Chrome or Edge, not inside a preview frame.'
+        : 'Connect failed: ' + (e && e.message || e);
+    }
+    hwDirty = true; hwRender();
+  }
+  async function hwReadLoop(k){
+    var n = hw[k], dec = new TextDecoder(), buf = '';
+    try {
+      n.reader = n.port.readable.getReader();
+      for (;;){
+        var r = await n.reader.read(); if (r.done) break;
+        buf += dec.decode(r.value, {stream:true});
+        var i; while ((i = buf.indexOf('\n')) >= 0){ hwHandleLine(buf.slice(0, i).trim(), k); buf = buf.slice(i + 1); }
+        if (buf.length > 400) buf = '';
+      }
+    } catch(e){ n.msg = 'Serial read stopped: ' + (e && e.message || e); }
+    try { n.reader.releaseLock(); } catch(e){}
+    try { n.writer.releaseLock(); } catch(e){}
+    try { await n.port.close(); } catch(e){}
+    n.port = n.reader = n.writer = null; n.connected = false; n.lastRisk = -1; hwDirty = true; hwRender();
+  }
+  async function hwDisconnect(k){ try { if (hw[k].reader) await hw[k].reader.cancel(); } catch(e){} }
+
+  /* ---- simulated feed (clearly labelled; same parser as real data) ---- */
+  var hwSim = {t:0, timer:null};
+  function hwSimTick(){
+    var t = ++hwSim.t, sc = document.getElementById('hwScenario').value;
+    var fl = sc === 'flood' || sc === 'all', bl = sc === 'blocked' || sc === 'all', lk = sc === 'leak' || sc === 'all';
+    var j = function(a){ return (Math.random() - 0.5) * a; };
+    var real = function(k){ return hw[k].source === 'serial' && Date.now() - hw[k].lastSeen < 4000; };
+    if (!real('CORE')){
+      var df = fl ? Math.min(0.95, 0.08 + t * 0.02) : 0.08, rf = fl ? Math.min(0.9, 0.05 + t * 0.018) : 0.04;
+      hwHandleLine('CORE,' + (hwCal.coreH - df * hwCal.coreFull + j(0.6)).toFixed(1) + ',' + Math.round(hwCal.rainDry - rf * (hwCal.rainDry - hwCal.rainWet) + j(30)) + ',0,0', 'sim');
+    }
+    if (!real('DRAIN')){
+      var b = bl ? Math.min(1, t * 0.03) : 0, upH = 5 + b * 25, dnH = Math.max(0.5, 5 - b * 4.5);
+      hwHandleLine('DRAIN,' + (hwCal.drUpH - upH + j(0.4)).toFixed(1) + ',' + (hwCal.drDnH - dnH + j(0.4)).toFixed(1) + ',' + Math.max(0, hwCal.drFlow * (0.95 - 0.95 * b) + j(0.4)).toFixed(2) + ',0', 'sim');
+    }
+    if (!real('JAL')){
+      var l = lk ? Math.min(1, t * 0.04) : 0;
+      hwHandleLine('JAL,' + (300 + j(2)).toFixed(1) + ',' + (285 - 70 * l + j(2)).toFixed(1) + ',' + (12 + j(0.2)).toFixed(2) + ',' + (12 * (1 - 0.45 * l) + j(0.2)).toFixed(2), 'sim');
+    }
+  }
+
+  /* ---- UI ---- */
+  function hwFmt(id, d){ return hwVals[id] === undefined ? '--' : hwVals[id].toFixed(d); }
+  function hwInfoText(k){
+    var n = hw[k], x = n.vals || {};
+    if (!n.live) return 'No data yet.';
+    if (k === 'CORE') return 'Level ' + hwFmt('depth',1) + ' cm  =  ' + state.level.toFixed(1) + ' m on the 8 m scale\nRain index ' + hwFmt('rain',0) + ' / 100\nFloat switch: ' + (x.flt ? 'WATER HIGH' : 'ok') + '\nDashboard risk: ' + STATE_META[state.riskState].label + '  |  device state ' + x.dev;
+    if (k === 'DRAIN') return 'Upstream ' + hwFmt('upH',1) + ' cm  |  downstream ' + hwFmt('dnH',1) + ' cm\nOutlet flow ' + hwFmt('dflow',1) + ' L/min\nBlockage score ' + hwFmt('block',0) + '%' + (x.dry ? ' (too little water to judge)' : '') + '\nOverflow float: ' + (x.flt ? 'TRIPPED' : 'ok');
+    return 'P1 ' + hwFmt('p1',0) + ' kPa  |  P2 ' + hwFmt('p2',0) + ' kPa\nF1 ' + hwFmt('f1',1) + '  |  F2 ' + hwFmt('f2',1) + ' L/min\nFlow loss ' + (x.def * 100).toFixed(0) + '%, pressure drop ' + x.dp.toFixed(0) + ' kPa\nLeak anomaly ' + hwFmt('anom',0) + '%' + (x.idle ? ' (no flow, cannot judge)' : '');
+  }
+  function hwRender(){
+    hwDirty = false;
+    var live = 0, sim = 0;
+    HW_KEYS.forEach(function(k){
+      var n = hw[k], pill = document.getElementById('hwPill-' + k);
+      if (n.live && n.source === 'sim'){ pill.textContent = 'SIMULATED'; pill.className = 'status-pill status-open'; sim++; }
+      else if (n.live){ pill.textContent = 'LIVE HARDWARE'; pill.className = 'status-pill status-resolved'; live++; }
+      else { pill.textContent = n.connected ? 'WAITING FOR DATA' : 'NOT CONNECTED'; pill.className = 'status-pill status-progress'; }
+      var b = document.getElementById('hwBtn-' + k); b.textContent = n.connected ? 'Disconnect' : 'Connect USB port';
+      document.getElementById('hwInfo-' + k).textContent = hwInfoText(k);
+      document.getElementById('hwMsg-' + k).textContent = n.msg;
+      document.getElementById('hwRaw-' + k).textContent = n.raw ? 'last: ' + n.raw : '';
+    });
+    var chip = document.getElementById('hwChip');
+    chip.textContent = live ? 'Hardware: ' + live + '/3 live' + (sim ? ' + ' + sim + ' sim' : '') : sim ? 'Simulated feed: ' + sim + '/3' : 'Hardware: not connected';
+    chip.className = 'badge ' + (live ? 'real' : sim ? 'sim' : 'info');
+    if (state.activeTab === 'hardware'){
+      HW_METRICS.forEach(function(m){ hwSpark(m[0]); });
+      if (hwLogDirty){ var c = document.getElementById('hwCon'); c.textContent = hwLog.join('\n'); c.scrollTop = c.scrollHeight; hwLogDirty = false; }
+    }
+  }
+  function hwSpark(id){
+    var cv = document.getElementById('hwS-' + id), h = hwHist[id] || [], w = cv.clientWidth, ht = cv.clientHeight;
+    document.getElementById('hwSv-' + id).textContent = h.length ? h[h.length - 1].toFixed(1) : '--';
+    if (!w) return;
+    var dpr = window.devicePixelRatio || 1; cv.width = w * dpr; cv.height = ht * dpr;
+    var g = cv.getContext('2d'); g.scale(dpr, dpr);
+    if (h.length < 2) return;
+    var mn = Math.min.apply(null, h), mx = Math.max.apply(null, h); if (mx - mn < 1e-6) mx = mn + 1;
+    g.strokeStyle = '#9AD4F0'; g.lineWidth = 1.6; g.beginPath();
+    h.forEach(function(v, i){ var x = i / (h.length - 1) * w, y = ht - 3 - (v - mn) / (mx - mn) * (ht - 6); if (i) g.lineTo(x, y); else g.moveTo(x, y); });
+    g.stroke();
+  }
+  function hwBuildCal(){
+    var f = document.getElementById('hwCal'); f.innerHTML = '';
+    HW_CAL_SPEC.forEach(function(s){
+      var lab = el('label', {}, [text(s[1])]);
+      var inp = el('input', {type:'number', step:String(s[2]), value:String(hwCal[s[0]])});
+      inp.addEventListener('input', function(){ var x = parseFloat(inp.value); if (isFinite(x)){ hwCal[s[0]] = x; hwSaveCal(); } });
+      lab.appendChild(inp); f.appendChild(lab);
+    });
+    document.getElementById('hwBaseNote').textContent = 'JalSetu normal baseline: flow loss ' + (hwCal.jBaseDef * 100).toFixed(0) + '%, pressure drop ' + hwCal.jBaseDp.toFixed(0) + ' kPa.';
+  }
+  function hwInit(){
+    if (!('serial' in navigator)) document.getElementById('hwUnsupported').style.display = 'block';
+    var nodes = document.getElementById('hwNodes');
+    HW_KEYS.forEach(function(k){
+      var c = el('div', {class:'card'});
+      c.innerHTML = '<h3>' + HW_LABEL[k] + ' <span class="status-pill" id="hwPill-' + k + '"></span></h3><div class="hw-vals mono" id="hwInfo-' + k + '" style="white-space:pre-line"></div><div class="slider-note" id="hwMsg-' + k + '"></div><div class="hw-raw mono" id="hwRaw-' + k + '"></div><div style="margin-top:10px"><button class="btn primary small" type="button" id="hwBtn-' + k + '"></button></div>';
+      c.querySelector('button').addEventListener('click', function(){ hw[k].connected ? hwDisconnect(k) : hwConnect(k); });
+      nodes.appendChild(c);
+    });
+    var sp = document.getElementById('hwSpark');
+    HW_METRICS.forEach(function(m){
+      var d = el('div', {class:'hw-spark'}); d.innerHTML = '<div class="t"><span>' + m[2] + ' <small class="mono" style="color:var(--text-muted)">' + m[3] + '</small></span><b id="hwSv-' + m[0] + '">--</b></div><canvas id="hwS-' + m[0] + '"></canvas>';
+      sp.appendChild(d);
+    });
+    hwBuildCal();
+    document.getElementById('hwBase').addEventListener('click', function(){
+      var x = hw.JAL.vals;
+      if (!hw.JAL.live || x.idle){ hw.JAL.msg = 'Need live JalSetu data with water flowing and no leak to capture a baseline.'; hwDirty = true; return; }
+      hwCal.jBaseDef = Math.max(0, x.def); hwCal.jBaseDp = Math.max(0, x.dp); hwSaveCal(); hwBuildCal();
+    });
+    document.getElementById('hwCalReset').addEventListener('click', function(){ hwCal = Object.assign({}, HW_DEF); hwSaveCal(); hwBuildCal(); });
+    document.getElementById('hwSend').addEventListener('click', function(){
+      var k = document.getElementById('hwCmdNode').value, i = document.getElementById('hwCmd'), s = i.value.trim();
+      if (!s) return;
+      if (hwWrite(k, s)){ hwLog.push('> ' + s + '  (to ' + HW_LABEL[k] + ')'); } else hwLog.push('! ' + HW_LABEL[k] + ' is not connected to a USB port');
+      hwLogDirty = true; i.value = '';
+    });
+    document.getElementById('hwSimOn').addEventListener('change', function(){
+      if (this.checked){ hwSim.t = 0; hwSim.timer = setInterval(hwSimTick, 1000); hwSimTick(); }
+      else { clearInterval(hwSim.timer); hwSim.timer = null; HW_KEYS.forEach(function(k){ if (hw[k].source === 'sim') hwSetLive(k, false); }); }
+    });
+    document.getElementById('hwScenario').addEventListener('change', function(){ hwSim.t = 0; });
+    var fwSel = 'CORE';
+    function showFw(k){ fwSel = k; document.getElementById('fwCode').textContent = FIRMWARE[k].code; }
+    document.querySelectorAll('[data-fw]').forEach(function(b){ b.addEventListener('click', function(){ showFw(b.getAttribute('data-fw')); }); });
+    document.getElementById('fwCopy').addEventListener('click', function(){
+      var btn = this, done = function(){ btn.textContent = 'Copied'; setTimeout(function(){ btn.textContent = 'Copy'; }, 1500); };
+      if (navigator.clipboard) navigator.clipboard.writeText(FIRMWARE[fwSel].code).then(done, function(){});
+    });
+    document.getElementById('fwDown').addEventListener('click', function(){
+      var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([FIRMWARE[fwSel].code], {type:'text/plain'})); a.download = FIRMWARE[fwSel].file; a.click();
+    });
+    showFw('CORE');
+    hwDrawCircuits();
+    setInterval(function(){
+      var now = Date.now();
+      HW_KEYS.forEach(function(k){ if (hw[k].live && now - hw[k].lastSeen > 4000) hwSetLive(k, false); });
+      if (hwDirty || hwLogDirty) hwRender();
+    }, 500);
+    hwRender();
+  }
+  function hwDrawCircuits(){
+    const D={
+core:{notes:[
+"JSN-SR04T ECHO outputs 5V. Wire ECHO → 1kΩ → GPIO18, and from GPIO18 → 2kΩ → GND (divider gives about 3.3V).",
+"Rain module is powered from 3V3 so its analog output never exceeds 3.3V.",
+"Float switch: one leg to GPIO27, other leg to GND. Firmware uses INPUT_PULLUP, so closed = water high.",
+"2-channel relay module: siren on relay 1, pump on relay 2. Most modules trigger on LOW. Put a 1N4007 diode across the pump (stripe to +).",
+"Pump and siren use their own 5V/12V supply through the relay COM/NO contacts. Share GND with the ESP32.",
+"SIM800L peaks near 2A: power it only from the 18650 via TP4056 OUT+/OUT−, with a 1000µF capacitor across its VCC/GND. Use a SIM with SMS enabled.",
+"Servo: 5V rail with a 470µF capacitor across servo VCC/GND. Power the ESP32 VIN, relay and servo from a 5V 2A USB adapter or power bank."],
+L:[
+{n:"JSN-SR04T (water level)",c:[["VCC","5V"],["GND","GND"],["TRIG","GPIO23"],["ECHO","GPIO18","1k+2k divider"]]},
+{n:"Rain sensor module",c:[["VCC","3V3"],["GND","GND"],["AO","GPIO34"]]},
+{n:"Reed float switch",c:[["leg 1","GPIO27","pull-up"],["leg 2","GND"]]},
+{n:"OLED SSD1306 (I2C)",c:[["VCC","3V3"],["GND","GND"],["SDA","GPIO21"],["SCL","GPIO22"]]}],
+R:[
+{n:"2-ch relay module",c:[["VCC","5V"],["GND","GND"],["IN1 siren","GPIO26"],["IN2 pump","GPIO25"],["COM1/NO1",null,"→ siren, ext supply"],["COM2/NO2",null,"→ pump, ext supply"]]},
+{n:"SG90 sluice servo",c:[["VCC","5V","+470µF"],["GND","GND"],["Signal","GPIO13"]]},
+{n:"LEDs (each with 220Ω)",c:[["green","GPIO32"],["yellow","GPIO33"],["orange","GPIO14"],["red","GPIO4"],["cathodes","GND"]]},
+{n:"SIM800L GSM",c:[["TXD","GPIO16"],["RXD","GPIO17"],["GND","GND"],["VCC",null,"← 18650 + 1000µF"]]}]},
+dw:{notes:[
+"Both JSN-SR04T ECHO pins need the same 1kΩ + 2kΩ divider as the core node (ECHO → 1k → GPIO → 2k → GND).",
+"YF-S201 signal is open-collector: add a 10kΩ pull-up from its signal wire to 3V3, then count pulses with an interrupt.",
+"Mount sensor 1 above the drain inlet (upstream) and sensor 2 above the outlet. Fix both heights so level readings are comparable.",
+"Active buzzer draws under 30mA from a GPIO. For a louder one use a 2N2222 transistor with a 1kΩ base resistor.",
+"Power from a 5V 1A USB supply into VIN."],
+L:[
+{n:"JSN-SR04T #1 (upstream)",c:[["VCC","5V"],["GND","GND"],["TRIG","GPIO23"],["ECHO","GPIO18","1k+2k divider"]]},
+{n:"JSN-SR04T #2 (downstream)",c:[["VCC","5V"],["GND","GND"],["TRIG","GPIO19"],["ECHO","GPIO21","1k+2k divider"]]},
+{n:"YF-S201 flow (outlet)",c:[["VCC","5V"],["GND","GND"],["Signal","GPIO27","10k pull-up 3V3"]]}],
+R:[
+{n:"Reed float (overflow)",c:[["leg 1","GPIO14","pull-up"],["leg 2","GND"]]},
+{n:"Active buzzer",c:[["+","GPIO26"],["−","GND"]]},
+{n:"LEDs (each with 220Ω)",c:[["green clear","GPIO32"],["yellow partial","GPIO33"],["red blocked","GPIO25"],["cathodes","GND"]]}]},
+js:{notes:[
+"Pressure transducers (0.5–4.5V output) must not feed 4.5V into the ESP32. Wire signal → 10kΩ → GPIO, and from GPIO → 20kΩ → GND (max 3.0V).",
+"Check the transducer supply: most 0–1.2MPa G1/4 types need 5V. Use a 0–0.5MPa or 0–1.2MPa range for low-pressure demo plumbing.",
+"YF-S201 signals need a 10kΩ pull-up to 3V3, same as DrainWatch.",
+"Optional isolation valve: 12V normally-closed solenoid on the relay COM/NO with its own 12V supply, and a 1N4007 across the coil.",
+"Demo a leak by opening a small tap on the pipe between the inlet and zone-end sensors."],
+L:[
+{n:"Pressure P1 (zone inlet)",c:[["red","5V"],["black","GND"],["signal","GPIO34","10k+20k divider"]]},
+{n:"Pressure P2 (zone end)",c:[["red","5V"],["black","GND"],["signal","GPIO35","10k+20k divider"]]},
+{n:"YF-S201 F1 (inlet)",c:[["VCC","5V"],["GND","GND"],["Signal","GPIO25","10k pull-up 3V3"]]},
+{n:"YF-S201 F2 (zone end)",c:[["VCC","5V"],["GND","GND"],["Signal","GPIO26","10k pull-up 3V3"]]}],
+R:[
+{n:"1-ch relay (isolation)",c:[["VCC","5V"],["GND","GND"],["IN","GPIO27"],["COM/NO",null,"→ 12V valve"]]},
+{n:"OLED SSD1306 (I2C)",c:[["VCC","3V3"],["GND","GND"],["SDA","GPIO21"],["SCL","GPIO22"]]},
+{n:"LEDs (each with 220Ω)",c:[["green normal","GPIO32"],["yellow anomaly","GPIO33"],["red leak","GPIO4"],["cathodes","GND"]]}]}
+};
+const RH=20,TH=24,G=10;
+function net(l){return l==='GND'?'g':(l==='5V'||l==='3V3')?'p':'s'}
+function draw(id,d){
+ let out='',yEnd=[];
+ [['L',10,190,320,'end',164],['R',570,750,440,'start',596]].forEach(([s,bx,bx2,ex,anc])=>{
+  let y=10;
+  d[s].forEach(p=>{
+   const h=TH+p.c.length*RH;
+   out+=`<rect x="${bx}" y="${y}" width="180" height="${h}" rx="4" fill="none" stroke="var(--ln)" stroke-width="1.5"/>`;
+   out+=`<text x="${bx+8}" y="${y+16}" font-size="11" font-weight="700">${p.n}</text>`;
+   p.c.forEach((r,i)=>{
+    const ry=y+TH+i*RH+10;
+    if(r[1]===null){out+=`<text x="${bx+8}" y="${ry+4}" font-size="10" fill="var(--mut)" style="fill:var(--mut)">${r[0]} ${r[2]}</text>`;return}
+    const col=`var(--${net(r[1])})`;
+    const pinx=s==='L'?bx+174:bx+6, ax=s==='L'?bx+170:bx+10;
+    const x1=s==='L'?bx+180:ex+120, x2=s==='L'?ex:bx;
+    out+=`<text x="${s==='L'?bx+172:bx+8}" y="${ry+4}" font-size="10" text-anchor="${s==='L'?'end':'start'}">${r[0]}</text>`;
+    const wa=s==='L'?bx+180:440, wb=s==='L'?320:570;
+    out+=`<line x1="${wa}" y1="${ry}" x2="${wb}" y2="${ry}" stroke="${col}" stroke-width="1.8"/>`;
+    out+=`<text x="${s==='L'?wb+6:wa-6}" y="${ry+4}" font-size="10" font-weight="700" text-anchor="${s==='L'?'start':'end'}">${r[1]}</text>`;
+    if(r[2])out+=`<text x="${(wa+wb)/2+(s==='L'?-14:14)}" y="${ry-3}" font-size="9" text-anchor="middle" style="fill:var(--mut)">${r[2]}</text>`;
+   });
+   y+=h+G;
+  });
+  yEnd.push(y);
+ });
+ const H=Math.max(...yEnd);
+ out=`<rect x="320" y="10" width="120" height="${H-10}" rx="6" fill="none" stroke="var(--ink)" stroke-width="2"/><text x="380" y="26" font-size="12" font-weight="700" text-anchor="middle">ESP32</text>`+out;
+ const el=document.getElementById(id);
+ el.setAttribute('viewBox',`0 0 760 ${H+4}`);el.innerHTML=out;
+ document.getElementById(id+'-n').innerHTML=d.notes.map(n=>`<li>${n}</li>`).join('');
+}
+draw('ckt-core',D.core);draw('ckt-dw',D.dw);draw('ckt-js',D.js);
+  }
+
+  /* ===================================================================
      INIT
      =================================================================== */
   renderCore(true);
@@ -1259,6 +1731,7 @@
   renderZoneControls();
   rerenderTicketsEverywhere();
   renderScorecard();
+  hwInit();
   showTab('overview');
 
 })();
